@@ -87,6 +87,13 @@ Das Ergebnis liegt anschließend in `dist\Passwort-Generator.exe`. Das
 Programmsymbol lässt sich mit `python icon_erzeugen.py` neu erzeugen; dafür
 wird Pillow gebraucht.
 
+## Mitmachen
+
+Fehlermeldungen, Vorschläge und Übersetzungen sind willkommen –
+[CONTRIBUTING.md](CONTRIBUTING.md) erklärt Aufbau, Stil und Tests.
+Sicherheitslücken bitte nicht als Issue, sondern über den Weg in
+[SECURITY.md](SECURITY.md).
+
 ## Lizenz
 
 [MIT](LICENSE) – Copyright 2026 Alexander Unverhau.

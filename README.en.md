@@ -83,6 +83,14 @@ build.cmd
 The result is `dist\Passwort-Generator.exe`. The program icon can be recreated
 with `python icon_erzeugen.py`, which needs Pillow.
 
+## Contributing
+
+Bug reports, suggestions and translations are welcome –
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the layout, the style and the tests
+(it is written in German, but issues and pull requests in English are just as
+welcome). Please report security issues through the route described in
+[SECURITY.md](SECURITY.md) rather than as an issue.
+
 ## Licence
 
 [MIT](LICENSE) – Copyright 2026 Alexander Unverhau.
