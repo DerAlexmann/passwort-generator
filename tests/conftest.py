@@ -31,8 +31,32 @@ def pg():
     return modul
 
 
+@pytest.fixture(scope="session")
+def tk_anker():
+    """Eine Tk-Wurzel, die die ganze Sitzung über bestehen bleibt.
+
+    Sie ist unsichtbar und wird nie benutzt; sie hält nur den Tcl-Interpreter
+    am Leben. Zerstört man die letzte Tk-Instanz und legt gleich darauf eine
+    neue an, findet Tcl auf manchen Rechnern seine Startdateien nicht mehr
+    ("Can't find a usable init.tcl") - so gesehen auf den Windows-Läufern der
+    CI. Mit dem Anker ist jedes Fenster der Tests eine *weitere* Instanz
+    neben einer bestehenden, und das ist unproblematisch.
+
+    Lässt sich schon der Anker nicht anlegen, gibt es keine Anzeige, und alle
+    Tests der Oberfläche werden übersprungen.
+    """
+    tk = pytest.importorskip("tkinter", reason="Tkinter ist nicht verfügbar")
+    try:
+        anker = tk.Tk()
+    except tk.TclError as fehler:                # z. B. Linux-Läufer ohne Bildschirm
+        pytest.skip(f"kein Bildschirm verfügbar: {fehler}")
+    anker.withdraw()
+    yield anker
+    anker.destroy()
+
+
 @pytest.fixture
-def fenster(pg):
+def fenster(pg, tk_anker):
     """Baut Fenster der Anwendung und räumt sie hinterher weg.
 
     Die Farb- und Textverzeichnisse des Programms gelten für genau ein
@@ -40,14 +64,8 @@ def fenster(pg):
     gebauten Fenster gibt es deshalb `vergleich()`, das die Verzeichnisse
     sichert und danach wiederherstellt.
     """
-    tk = pytest.importorskip("tkinter", reason="Tkinter ist nicht verfügbar")
+    import tkinter as tk
     from tkinter import ttk
-
-    try:
-        probe = tk.Tk()
-    except tk.TclError as fehler:                # z. B. Linux-Läufer ohne Bildschirm
-        pytest.skip(f"kein Bildschirm verfügbar: {fehler}")
-    probe.destroy()
 
     pg._tk, pg._ttk = tk, ttk
     pg.widgets_bereitstellen()
