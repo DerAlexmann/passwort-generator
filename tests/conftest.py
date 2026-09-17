@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.machinery
 import importlib.util
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -31,25 +32,42 @@ def pg():
     return modul
 
 
+def tk_wurzel_anlegen(tk, versuche=4):
+    """Eine Tk-Wurzel anlegen, notfalls in mehreren Anläufen.
+
+    Auf den Windows-Läufern der CI schlägt das Anlegen gelegentlich mit
+    "Can't find a usable init.tcl ... couldn't read file ...: No error" fehl:
+    Die Startdateien von Tcl liegen am richtigen Ort, lassen sich in diesem
+    Moment aber nicht lesen. Das ist eine Eigenheit der Umgebung und kein
+    Befund über das Programm, deshalb ein paar Anläufe - und wenn es dabei
+    bleibt, wird der Test übersprungen statt als Fehler gemeldet.
+    """
+    letzter = None
+    for nummer in range(versuche):
+        try:
+            return tk.Tk()
+        except tk.TclError as fehler:
+            letzter = fehler
+            time.sleep(0.5 * (nummer + 1))
+    pytest.skip(f"Tk ließ sich nicht starten: {letzter}")
+    return None                                  # unerreichbar, der Klarheit halber
+
+
 @pytest.fixture(scope="session")
 def tk_anker():
     """Eine Tk-Wurzel, die die ganze Sitzung über bestehen bleibt.
 
     Sie ist unsichtbar und wird nie benutzt; sie hält nur den Tcl-Interpreter
     am Leben. Zerstört man die letzte Tk-Instanz und legt gleich darauf eine
-    neue an, findet Tcl auf manchen Rechnern seine Startdateien nicht mehr
-    ("Can't find a usable init.tcl") - so gesehen auf den Windows-Läufern der
-    CI. Mit dem Anker ist jedes Fenster der Tests eine *weitere* Instanz
-    neben einer bestehenden, und das ist unproblematisch.
+    neue an, findet Tcl auf manchen Rechnern seine Startdateien nicht mehr.
+    Mit dem Anker ist jedes Fenster der Tests eine *weitere* Instanz neben
+    einer bestehenden.
 
     Lässt sich schon der Anker nicht anlegen, gibt es keine Anzeige, und alle
     Tests der Oberfläche werden übersprungen.
     """
     tk = pytest.importorskip("tkinter", reason="Tkinter ist nicht verfügbar")
-    try:
-        anker = tk.Tk()
-    except tk.TclError as fehler:                # z. B. Linux-Läufer ohne Bildschirm
-        pytest.skip(f"kein Bildschirm verfügbar: {fehler}")
+    anker = tk_wurzel_anlegen(tk)
     anker.withdraw()
     yield anker
     anker.destroy()
@@ -75,7 +93,7 @@ def fenster(pg, tk_anker):
         def bauen(self, sprache="de", schema="light", laenge=None):
             pg._.language = sprache
             pg.apply_theme(schema)
-            wurzel = tk.Tk()
+            wurzel = tk_wurzel_anlegen(tk)
             app = pg.PasswortApp(wurzel)
             if laenge is not None:
                 app.var_laenge.set(laenge)
