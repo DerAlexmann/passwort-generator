@@ -1,5 +1,7 @@
 # Passwort-Generator
 
+[![CI](https://github.com/DerAlexmann/passwort-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/DerAlexmann/passwort-generator/actions/workflows/ci.yml)
+
 Ein Passwortgenerator für Windows mit Schieberegler für die Länge, farbiger
 Stärkeanzeige und einem Klick in die Zwischenablage. Die Oberfläche ist
 deutsch und englisch, hell und dunkel, und merkt sich alle Einstellungen bis

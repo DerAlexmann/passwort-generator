@@ -1,5 +1,7 @@
 # Password Generator
 
+[![CI](https://github.com/DerAlexmann/passwort-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/DerAlexmann/passwort-generator/actions/workflows/ci.yml)
+
 A password generator for Windows with a slider for the length, a colour-coded
 strength bar and one click to the clipboard. The interface comes in German and
 English, light and dark, and remembers every setting until the next start.
