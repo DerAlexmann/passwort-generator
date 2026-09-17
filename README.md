@@ -33,6 +33,14 @@ zum nächsten Start.
 [Releases](../../releases) herunterladen und starten. Es wird nichts
 installiert; die Einstellungsdatei entsteht beim ersten Schließen daneben.
 
+> **Beim ersten Start**: Die EXE ist nicht signiert. Windows SmartScreen
+> fragt deshalb einmalig nach – „Weitere Informationen" → „Trotzdem
+> ausführen". Auch ein Virenschutz hält eine frisch heruntergeladene,
+> unbekannte Datei gern für ein paar Sekunden fest, während er sie prüft; ein
+> Startversuch in dieser Zeit kann mit „Zugriff verweigert" abbrechen.
+> Einfach kurz warten und erneut starten. Wer sichergehen will, vergleicht
+> vorher die SHA-256-Prüfsumme aus den Release-Notizen.
+
 **Als Skript:** `Passwort-Generator.pyw` doppelklicken. Nötig ist nur Python
 3.10 oder neuer mit Tkinter, das bei der Windows-Installation dabei ist.
 Weitere Pakete braucht das Programm nicht.

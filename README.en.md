@@ -31,6 +31,13 @@ English, light and dark, and remembers every setting until the next start.
 [releases](../../releases) and start it. Nothing is installed; the settings
 file appears next to it when you first close the window.
 
+> **On first start**: the executable is not signed, so Windows SmartScreen
+> asks once – "More info" → "Run anyway". Antivirus software also tends to
+> hold on to a freshly downloaded, unknown file for a few seconds while it
+> scans it; starting the program during that time may fail with "Access
+> denied". Wait a moment and start it again. To be on the safe side, compare
+> the SHA-256 checksum from the release notes first.
+
 **As a script:** double-click `Passwort-Generator.pyw`. All it needs is Python
 3.10 or newer with Tkinter, which ships with the Windows installer. No further
 packages are required.
