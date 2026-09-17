@@ -1,0 +1,30 @@
+[project]
+name = "passwort-generator"
+version = "1.1.0"
+description = "Passwortgenerator mit Schieberegler, Stärkeanzeige und Zwischenablage"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Alexander Unverhau" }]
+dependencies = []                      # nur die Standardbibliothek
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle - Fehler
+    "W",    # pycodestyle - Warnungen
+    "F",    # Pyflakes
+    "I",    # isort - Importreihenfolge
+    "B",    # flake8-bugbear - typische Fallstricke
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade - veraltete Schreibweisen
+    "RET",  # flake8-return
+]
+ignore = [
+    # Die Farbnamen (BG, CARD, TEXT ...) legt apply_theme() zur Laufzeit als
+    # Modulvariablen an; Ruff sieht sie deshalb als undefiniert an.
+    "F821",
+]
