@@ -11,6 +11,8 @@ dependencies = []                      # nur die Standardbibliothek
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# Ruff prüft .pyw-Dateien sonst nicht - das ganze Programm steckt aber in einer.
+extend-include = ["*.pyw"]
 
 [tool.ruff.lint]
 select = [
