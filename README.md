@@ -14,8 +14,10 @@ zum nächsten Start.
 ## Was er kann
 
 - **Länge von 4 bis 64 Zeichen**, in Einerschritten am Schieberegler.
-- **Stärkeanzeige** als farbiger Balken: rot bis 8 Zeichen, gelb bei 9 und 10,
-  grün ab 11.
+- **Stärkeanzeige** als farbiger Balken. Gemessen wird der Zufall im Passwort
+  in Bit, also Länge und Zeichenvorrat zusammen: rot unter 55 Bit, gelb bis
+  70 Bit, grün darüber. Mit allen vier Zeichengruppen heißt das rot bis 8
+  Zeichen, gelb bei 9 und 10, grün ab 11 – aus Ziffern allein braucht es 22.
 - **Zeichenauswahl** per Haken – Großbuchstaben, Kleinbuchstaben, Ziffern,
   Satz- und Sonderzeichen. Jede angehakte Gruppe kommt mindestens einmal vor,
   solange die Länge dafür reicht; damit scheitert kein Passwort an einer
@@ -65,6 +67,11 @@ Python-Modul [`secrets`](https://docs.python.org/3/library/secrets.html), das
 für Passwörter und Schlüssel gedacht ist. Aus jeder angehakten Gruppe kommt
 zuerst ein Zeichen, der Rest wird aus dem gesamten Vorrat gezogen, und zum
 Schluss wird die Reihenfolge mit `secrets.randbelow` gemischt.
+
+Wie stark das Ergebnis ist, hängt an beidem: an der Länge und daran, aus wie
+vielen Zeichen gewürfelt wurde. Die Stärkeanzeige rechnet daraus den Zufall
+in Bit – Länge mal Logarithmus des Zeichenvorrats. Jedes Bit verdoppelt die
+Zahl der Möglichkeiten; die Fußzeile zeigt beide Zahlen.
 
 Das erzeugte Passwort wird nirgends gespeichert; es verschwindet mit dem
 Schließen des Fensters. In der Einstellungsdatei stehen nur Länge,

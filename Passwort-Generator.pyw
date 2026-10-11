@@ -1,5 +1,5 @@
 """
-Passwort-Generator 1.1.0 - sichere Passwoerter erzeugen und kopieren
+Passwort-Generator 1.2.0 - sichere Passwoerter erzeugen und kopieren
 
 Erzeugt Passwoerter aus den gewaehlten Zeichengruppen mit dem
 Zufallsgenerator des Betriebssystems (secrets) und legt sie auf Wunsch in
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import locale
+import math
 import os
 import secrets
 import string
@@ -27,7 +28,7 @@ import sys
 from dataclasses import dataclass
 
 PROGRAMM = "Passwort-Generator"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # Von gui_starten() belegt, sobald Tkinter geladen ist.
 _tk = None
@@ -276,9 +277,16 @@ MIN_LAENGE = 4
 MAX_LAENGE = 64
 VORGABE_LAENGE = MIN_LAENGE
 
-# Grenzen der Staerkeanzeige: bis 8 rot, bis 10 gelb, darueber gruen.
-SCHWACH_BIS = 8
-MITTEL_BIS = 10
+# Grenzen der Staerkeanzeige in Bit. Jedes Bit verdoppelt die Zahl der
+# Moeglichkeiten; ab 70 Bit ist Durchprobieren auf absehbare Zeit aussichtslos.
+# Bei allen vier Gruppen fallen die Grenzen auf dieselben Laengen wie vorher -
+# rot bis 8 Zeichen, gelb bei 9 und 10, gruen ab 11. Kleine Zeichenvorraete
+# werden jetzt aber richtig abgewertet: 11 Ziffern sind nur 37 Bit.
+SCHWACH_BIS_BIT = 55
+MITTEL_BIS_BIT = 70
+
+# Ab hier ist der Balken voll; weitere Bit aendern am Urteil nichts mehr.
+BALKEN_VOLL_BIT = 100
 
 
 @dataclass(frozen=True)
@@ -323,11 +331,22 @@ def passwort_erzeugen(laenge: int, gruppen) -> str:
     return "".join(zeichen)
 
 
-def staerke_stufe(laenge: int) -> str:
+def staerke_bits(laenge: int, gruppen) -> float:
+    """Zufall im Passwort in Bit: Laenge mal Entropie eines einzelnen Zeichens.
+
+    Die Laenge allein sagt darueber wenig. 11 Ziffern sind 37 Bit und binnen
+    Stunden durchprobiert; 11 Zeichen aus allen vier Gruppen sind 72 Bit. Erst
+    Laenge und Zeichenvorrat zusammen ergeben ein Urteil.
+    """
+    vorrat = len(vorrat_bilden(gruppen))
+    return laenge * math.log2(vorrat) if vorrat > 1 else 0.0
+
+
+def staerke_stufe(bits: float) -> str:
     """Stufe der Staerkeanzeige: "schwach", "mittel" oder "stark"."""
-    if laenge <= SCHWACH_BIS:
+    if bits < SCHWACH_BIS_BIT:
         return "schwach"
-    if laenge <= MITTEL_BIS:
+    if bits < MITTEL_BIS_BIT:
         return "mittel"
     return "stark"
 
@@ -980,15 +999,15 @@ class PasswortApp:
         karte_staerke = make_card(raster, fill="x", pady=(12, 0))
         card_title(karte_staerke, _("Farben der Stärkeanzeige"))
         card_text(karte_staerke,
-                  _("Rot: {a} bis {b} Zeichen. Gelb: {c} bis {d} Zeichen. "
-                    "Grün: ab {e} Zeichen.").format(
-                      a=MIN_LAENGE, b=SCHWACH_BIS, c=SCHWACH_BIS + 1, d=MITTEL_BIS,
-                      e=MITTEL_BIS + 1))
+                  _("Rot: unter {a} Bit. Gelb: von {a} Bit an. Grün: von {b} Bit an.").format(
+                      a=SCHWACH_BIS_BIT, b=MITTEL_BIS_BIT))
         card_text(karte_staerke,
-                  _("Die Anzeige richtet sich allein nach der Länge, weil sie bei einem "
-                    "zufälligen Passwort am schwersten wiegt: Jedes weitere Zeichen "
-                    "vervielfacht die Zahl der Möglichkeiten. Wie viele Zeichen zur "
-                    "Auswahl stehen, steht rechts unten in der Fußzeile."))
+                  _("Gemessen wird nicht die Länge, sondern der Zufall darin – in Bit. "
+                    "Jedes Bit verdoppelt die Zahl der Möglichkeiten; wie viele "
+                    "zusammenkommen, hängt an Länge und Zeichenvorrat zugleich. "
+                    "11 Ziffern sind 37 Bit und damit schwach, 11 Zeichen aus allen "
+                    "vier Gruppen sind 72 Bit und stark. Beide Zahlen stehen unten "
+                    "in der Fußzeile."))
 
         karte_daten = make_card(raster, fill="x", pady=(12, 0))
         card_title(karte_daten, _("Was gespeichert wird"))
@@ -1111,15 +1130,29 @@ class PasswortApp:
 
     # -- Eingaben ----------------------------------------------------------
 
-    def _laenge_geaendert(self, sichern: bool = True) -> None:
-        laenge = self.var_laenge.get()
-        self.var_zahl.set(str(laenge))
-        stufe = staerke_stufe(laenge)
-        anteil = (laenge - MIN_LAENGE) / (MAX_LAENGE - MIN_LAENGE)
-        self.balken.setzen(anteil, STAERKE_ROLLE[stufe])
-        self.staerke_text.configure(fg=THEMES[CURRENT_THEME][STAERKE_ROLLE[stufe]])
+    def _staerke_auffrischen(self) -> None:
+        """Stärkeanzeige und Fußzeile neu bilden.
+
+        Beide hängen an der Länge und am Zeichenvorrat zugleich: Ein Haken
+        weniger bedeutet weniger Bit, auch wenn die Länge gleich bleibt.
+        Deshalb ruft nicht nur der Schieberegler hier herein, sondern auch
+        jede Zeichengruppe.
+        """
+        gruppen = self.gewaehlte_gruppen()
+        self.staerke_bits = staerke_bits(self.var_laenge.get(), gruppen)
+        stufe = staerke_stufe(self.staerke_bits)
         self.staerke_stufe = stufe
+        self.balken.setzen(min(1.0, self.staerke_bits / BALKEN_VOLL_BIT),
+                           STAERKE_ROLLE[stufe])
+        self.staerke_text.configure(fg=THEMES[CURRENT_THEME][STAERKE_ROLLE[stufe]])
         self.var_staerke.set(_(STAERKE_TEXT[stufe]))
+        self._vorrat = _("Zeichenvorrat: {anzahl} Zeichen · {bits} Bit").format(
+            anzahl=len(vorrat_bilden(gruppen)), bits=round(self.staerke_bits))
+        self.var_vorrat.set(self._vorrat)
+
+    def _laenge_geaendert(self, sichern: bool = True) -> None:
+        self.var_zahl.set(str(self.var_laenge.get()))
+        self._staerke_auffrischen()
         if sichern:
             self._veraltet_melden()
             self._spaeter_sichern()
@@ -1127,7 +1160,7 @@ class PasswortApp:
     def _auswahl_geaendert(self, sichern: bool = True) -> None:
         gruppen = self.gewaehlte_gruppen()
         self.knopf_neu.configure(state="normal" if gruppen else "disabled")
-        self._vorrat_zeigen()
+        self._staerke_auffrischen()
         if not gruppen:
             self.status(_("Bitte mindestens eine Zeichengruppe auswählen."))
         else:
@@ -1139,11 +1172,6 @@ class PasswortApp:
         """Nach einer Änderung daran erinnern, dass das Passwort noch das alte ist."""
         if self.passwort:
             self.status(_("Einstellung geändert – „Neu generieren“ übernimmt sie."))
-
-    def _vorrat_zeigen(self) -> None:
-        anzahl = len(vorrat_bilden(self.gewaehlte_gruppen()))
-        self._vorrat = _("Zeichenvorrat: {anzahl}").format(anzahl=anzahl)
-        self.var_vorrat.set(self._vorrat)
 
     def status(self, text) -> None:
         """Statusmeldung zeigen und für einen späteren Sprachwechsel merken."""
@@ -1397,7 +1425,8 @@ TRANSLATIONS = {
             "Please select at least one group of characters.",
         "Einstellung geändert – „Neu generieren“ übernimmt sie.":
             "Setting changed – “Generate new” applies it.",
-        "Zeichenvorrat: {anzahl}": "Character pool: {anzahl}",
+        "Zeichenvorrat: {anzahl} Zeichen · {bits} Bit":
+            "Character pool: {anzahl} characters · {bits} bits",
 
         # Reiter 2
         "Wie das Passwort entsteht": "How the password is made",
@@ -1413,18 +1442,19 @@ TRANSLATIONS = {
             "long as the length allows, so a password will not be rejected by "
             "a form that insists on a digit. Finally the order is shuffled.",
         "Farben der Stärkeanzeige": "Colours of the strength bar",
-        "Rot: {a} bis {b} Zeichen. Gelb: {c} bis {d} Zeichen. "
-        "Grün: ab {e} Zeichen.":
-            "Red: {a} to {b} characters. Yellow: {c} to {d} characters. "
-            "Green: {e} characters and up.",
-        "Die Anzeige richtet sich allein nach der Länge, weil sie bei einem "
-        "zufälligen Passwort am schwersten wiegt: Jedes weitere Zeichen "
-        "vervielfacht die Zahl der Möglichkeiten. Wie viele Zeichen zur "
-        "Auswahl stehen, steht rechts unten in der Fußzeile.":
-            "The bar follows the length alone, because for a random password "
-            "that is what counts most: every further character multiplies the "
-            "number of possibilities. How many characters are available is "
-            "shown at the bottom right.",
+        "Rot: unter {a} Bit. Gelb: von {a} Bit an. Grün: von {b} Bit an.":
+            "Red: below {a} bits. Yellow: from {a} bits. Green: from {b} bits.",
+        "Gemessen wird nicht die Länge, sondern der Zufall darin – in Bit. "
+        "Jedes Bit verdoppelt die Zahl der Möglichkeiten; wie viele "
+        "zusammenkommen, hängt an Länge und Zeichenvorrat zugleich. "
+        "11 Ziffern sind 37 Bit und damit schwach, 11 Zeichen aus allen "
+        "vier Gruppen sind 72 Bit und stark. Beide Zahlen stehen unten "
+        "in der Fußzeile.":
+            "What counts is not the length but the randomness in it – in bits. "
+            "Every bit doubles the number of possibilities; how many add up "
+            "depends on length and character pool together. 11 digits are 37 "
+            "bits and weak, 11 characters from all four groups are 72 bits and "
+            "strong. Both numbers are shown at the bottom.",
         "Was gespeichert wird": "What is stored",
         "Gespeichert werden Länge, Zeichenauswahl, Sprache, Farbschema und "
         "Fensterlage – in der Datei {datei} neben dem Programm. Das erzeugte "

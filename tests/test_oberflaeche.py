@@ -47,16 +47,34 @@ def test_erzeugen_und_kopieren(pg, fenster):
 
 def test_staerkeanzeige_folgt_der_laenge(pg, fenster):
     app = fenster.bauen()
-    for laenge in (pg.MIN_LAENGE, pg.SCHWACH_BIS, pg.SCHWACH_BIS + 1, pg.MITTEL_BIS,
-                   pg.MITTEL_BIS + 1, pg.MAX_LAENGE):
+    gruppen = app.gewaehlte_gruppen()
+    for laenge in (pg.MIN_LAENGE, 8, 9, 10, 11, pg.MAX_LAENGE):
         app.var_laenge.set(laenge)
         app._laenge_geaendert(sichern=False)
-        stufe = pg.staerke_stufe(laenge)
+        stufe = pg.staerke_stufe(pg.staerke_bits(laenge, gruppen))
         farbe = pg.THEMES[pg.CURRENT_THEME][pg.STAERKE_ROLLE[stufe]]
         assert app.balken.rolle == pg.STAERKE_ROLLE[stufe]
         assert str(app.staerke_text.cget("fg")) == farbe
         assert app.var_zahl.get() == str(laenge)
     assert app.balken.anteil == 1.0
+
+
+def test_staerkeanzeige_folgt_dem_zeichenvorrat(pg, fenster):
+    """Haken wegnehmen schwächt die Anzeige, obwohl die Länge bleibt."""
+    app = fenster.bauen(laenge=12)
+    assert app.staerke_stufe == "stark"
+    voller_balken = app.balken.anteil
+
+    for schluessel in ("gross", "klein", "sonder"):
+        app.var_gruppen[schluessel].set(False)
+    app._auswahl_geaendert(sichern=False)
+
+    assert app.staerke_stufe == "schwach"          # 12 Ziffern sind 40 Bit
+    assert round(app.staerke_bits) == 40
+    assert app.balken.rolle == pg.STAERKE_ROLLE["schwach"]
+    assert app.balken.anteil < voller_balken
+    assert "40" in app.var_vorrat.get()
+    assert "10" in app.var_vorrat.get()           # nur noch zehn Zeichen im Vorrat
 
 
 def test_ohne_zeichengruppe_kein_erzeugen(pg, fenster):

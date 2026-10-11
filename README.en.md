@@ -13,7 +13,10 @@ English, light and dark, and remembers every setting until the next start.
 ## What it does
 
 - **Length from 4 to 64 characters**, in steps of one on the slider.
-- **Strength bar**: red up to 8 characters, yellow at 9 and 10, green from 11.
+- **Strength bar**. It measures the randomness in the password in bits, so
+  length and character pool together: red below 55 bits, yellow up to 70
+  bits, green above. With all four groups ticked that means red up to 8
+  characters, yellow at 9 and 10, green from 11 – digits alone need 22.
 - **Character selection** by tick box – uppercase letters, lowercase letters,
   digits, punctuation and special characters. Every ticked group appears at
   least once as long as the length allows, so a password will not be rejected
@@ -62,6 +65,11 @@ Python's [`secrets`](https://docs.python.org/3/library/secrets.html) module,
 which is meant for passwords and keys. One character comes from each ticked
 group first, the rest is drawn from the whole pool, and finally the order is
 shuffled with `secrets.randbelow`.
+
+How strong the result is depends on both the length and how many characters
+it was drawn from. The strength bar turns that into bits of randomness –
+length times the logarithm of the character pool. Every bit doubles the
+number of possibilities; the footer shows both numbers.
 
 The generated password is never written down; it is gone once the window
 closes. The settings file only holds length, character selection, language,

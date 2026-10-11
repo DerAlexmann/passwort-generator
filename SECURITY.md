@@ -19,7 +19,7 @@ Gepflegt wird jeweils die neueste veröffentlichte Version.
 
 | Version | Unterstützt |
 |---|---|
-| 1.1.x | ja |
+| 1.2.x | ja |
 | älter | nein |
 
 ## Wie das Programm mit Passwörtern umgeht

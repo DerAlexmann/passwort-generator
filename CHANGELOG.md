@@ -3,6 +3,23 @@
 Das Format folgt [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionsnummern der [semantischen Versionierung](https://semver.org/lang/de/).
 
+## [1.2.0] – 2026-10-11
+
+### Geändert
+
+- Die Stärkeanzeige bewertet jetzt den Zufall im Passwort in Bit statt
+  allein die Länge. Bisher war alles ab 11 Zeichen grün, egal aus wie
+  vielen Zeichen gewürfelt wurde – 11 Ziffern (37 Bit) sahen damit so
+  stark aus wie 11 Zeichen aus allen vier Gruppen (72 Bit). Rot ist jetzt
+  alles unter 55 Bit, gelb bis 70 Bit, grün darüber. Mit allen vier
+  Gruppen bleiben die Grenzen dieselben wie vorher – rot bis 8 Zeichen,
+  gelb bei 9 und 10, grün ab 11; kleine Zeichenvorräte werden aber nicht
+  mehr zu gut bewertet. Aus Ziffern allein braucht es nun 22 Zeichen für
+  grün.
+- Die Fußzeile nennt neben dem Zeichenvorrat auch die erreichten Bit, und
+  der Balken folgt ihnen: Er ist bei 100 Bit voll, nicht mehr erst bei 64
+  Zeichen. Der Reiter „Erklärungen“ beschreibt die neuen Grenzen.
+
 ## [1.1.0] – 2026-09-17
 
 ### Hinzugefügt
