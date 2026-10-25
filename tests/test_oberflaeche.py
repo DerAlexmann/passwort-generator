@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import sys
 
 import pytest
 from conftest import farben_sammeln, texte_sammeln
@@ -440,3 +441,82 @@ def test_anzeige_rechnet_wie_die_funktion(pg, fenster):
         assert app.pruef_bits == pg.geschaetzte_bits(passwort), passwort
         if passwort:
             assert str(pg.vorrat_schaetzen(passwort)) in app.var_pruef_zahlen.get()
+
+
+def test_fehler_im_rueckruf_wird_gemeldet(pg, fenster):
+    """Die Meldung nennt die Art des Fehlers - und nie seinen Inhalt.
+
+    In der Fehlermeldung könnte das geprüfte Passwort stecken; in der
+    Statuszeile hat es nichts zu suchen.
+    """
+    app = fenster.bauen()
+    assert app.master.report_callback_exception == app._rueckruf_fehler
+
+    try:
+        raise KeyError("Sommer2024!")
+    except KeyError:
+        app._rueckruf_fehler(*sys.exc_info())
+
+    gemeldet = app.var_status.get()
+    assert gemeldet == ("Ein Fehler ist aufgetreten (KeyError). "
+                        "Die Anzeige kann veraltet sein.")
+    assert "Sommer2024" not in gemeldet
+    assert str(app.status_text.cget("fg")) == pg.THEMES[pg.CURRENT_THEME]["DANGER"]
+
+
+def test_fehler_in_einem_echten_rueckruf_kommt_an(pg, fenster, capsys):
+    """Nicht nur die Funktion, auch der Weg von Tk dorthin muss stimmen."""
+    app = fenster.bauen()
+    stolperstein = pg._tk.StringVar(master=app.master, value="")
+    stolperstein.trace_add("write", lambda *_ereignis: 1 / 0)
+
+    stolperstein.set("x")
+    app.master.update()
+
+    assert "ZeroDivisionError" in app.var_status.get()
+    assert str(app.status_text.cget("fg")) == pg.THEMES[pg.CURRENT_THEME]["DANGER"]
+    # Wer aus der Konsole startet, bekommt zusätzlich die ganze Spur.
+    assert "ZeroDivisionError" in capsys.readouterr().err
+
+
+def test_fehlermeldung_folgt_sprache_und_schema(pg, fenster):
+    app = fenster.bauen()
+    try:
+        raise ValueError("egal")
+    except ValueError:
+        app._rueckruf_fehler(*sys.exc_info())
+
+    app.sprache_setzen("en")
+    assert app.var_status.get() == ("Something went wrong (ValueError). "
+                                    "What you see may be out of date.")
+    assert str(app.status_text.cget("fg")) == pg.THEMES[pg.CURRENT_THEME]["DANGER"]
+
+    app.var_dunkel.set(True)
+    app._schema_umgeschaltet()
+    assert str(app.status_text.cget("fg")) == pg.THEMES["dark"]["DANGER"]
+
+    # Die nächste gewöhnliche Meldung nimmt die Farbe wieder zurück.
+    app.erzeugen()
+    assert str(app.status_text.cget("fg")) == pg.THEMES["dark"]["MUTED"]
+
+
+def test_gescheiterte_pruefung_laesst_kein_altes_urteil_stehen(pg, fenster, monkeypatch):
+    """Ein Fehler darf nicht dazu führen, dass eine falsche Stärke stehen bleibt."""
+    app = fenster.bauen()
+    app.var_pruefen.set("Geheim123!!")
+    app.master.update()
+    assert app.pruef_stufe == "stark"
+
+    def platzt(_passwort):
+        raise RuntimeError("kaputt")
+
+    monkeypatch.setattr(pg, "geschaetzte_bits", platzt)
+    app.var_pruefen.set("Geheim123!!x")
+    app.master.update()
+
+    assert app.pruef_stufe is None
+    assert app.pruef_bits == 0.0
+    assert app.pruef_balken.anteil == 0.0
+    assert app.var_pruef_staerke.get() == ""
+    assert app.var_pruef_zahlen.get() == "Die Prüfung ist fehlgeschlagen."
+    assert "RuntimeError" in app.var_status.get()

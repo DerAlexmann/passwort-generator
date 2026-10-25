@@ -3,6 +3,22 @@
 Das Format folgt [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionsnummern der [semantischen Versionierung](https://semver.org/lang/de/).
 
+## [1.3.1] – 2026-10-25
+
+### Behoben
+
+- Fehler aus einem Tk-Rückruf verschwanden spurlos. Tk schickt sie nach
+  `sys.stderr`, und das gibt es in einem `.pyw`-Fenster nicht; auf dem
+  Bildschirm konnte dabei eine Anzeige stehen bleiben, die nicht mehr
+  stimmte. Sie stehen jetzt rot in der Statuszeile. Genannt wird nur die
+  Art des Fehlers – seine Meldung könnte das geprüfte Passwort enthalten.
+- Scheitert die Bewertung eines eingegebenen Passworts, bleibt kein altes
+  Urteil stehen: Balken und Stufe gehen zurück, die Zeile meldet „Die
+  Prüfung ist fehlgeschlagen“.
+- Die Tk-Variablen hängen jetzt ausdrücklich am Fenster des Programms und
+  nicht mehr an der Standard-Wurzel von Tkinter. Sonst ginge ein Fehler aus
+  ihrem Rückruf an die Fehlerbehandlung eines fremden Fensters.
+
 ## [1.3.0] – 2026-10-25
 
 ### Hinzugefügt

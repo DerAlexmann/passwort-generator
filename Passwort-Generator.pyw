@@ -1,5 +1,5 @@
 """
-Passwort-Generator 1.3.0 - sichere Passwoerter erzeugen und kopieren
+Passwort-Generator 1.3.1 - sichere Passwoerter erzeugen und kopieren
 
 Erzeugt Passwoerter aus den gewaehlten Zeichengruppen mit dem
 Zufallsgenerator des Betriebssystems (secrets) und legt sie auf Wunsch in
@@ -25,10 +25,11 @@ import os
 import secrets
 import string
 import sys
+import traceback
 from dataclasses import dataclass
 
 PROGRAMM = "Passwort-Generator"
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 # Von gui_starten() belegt, sobald Tkinter geladen ist.
 _tk = None
@@ -647,6 +648,7 @@ class PasswortApp:
         self.nachlauf = None                 # laufender after()-Auftrag zum Sichern
         self.bestaetigung_nachlauf = None    # laufender after()-Auftrag der Bestätigung
         self._status = None                  # zuletzt gezeigte Statusmeldung
+        self._status_art = "ruhe"            # "fehler" faerbt die Statuszeile rot
         self._vorrat = ""                    # Fußzeile rechts, für den Sprachwechsel
         self._pruef_zahlen = ""              # Befund des Prüffelds, ebenso
         self.pruef_bits = 0.0
@@ -776,11 +778,14 @@ class PasswortApp:
     # -- Zustand -----------------------------------------------------------
 
     def _variablen_anlegen(self, einstellungen: dict) -> None:
-        tk = _tk
+        # Jede Variable gehört ausdrücklich diesem Fenster. Ohne Angabe
+        # nähme Tkinter die Standard-Wurzel - und ein Fehler aus ihrem
+        # Rückruf ginge an deren Fehlerbehandlung statt an unsere.
+        tk, master = _tk, self.master
         laenge = einstellungen.get("laenge", VORGABE_LAENGE)
         if not isinstance(laenge, int) or not MIN_LAENGE <= laenge <= MAX_LAENGE:
             laenge = VORGABE_LAENGE
-        self.var_laenge = tk.IntVar(value=laenge)
+        self.var_laenge = tk.IntVar(master, value=laenge)
 
         gewaehlt = einstellungen.get("zeichen")
         self.var_gruppen = {}
@@ -788,23 +793,23 @@ class PasswortApp:
             an = True
             if isinstance(gewaehlt, dict) and isinstance(gewaehlt.get(gruppe.schluessel), bool):
                 an = gewaehlt[gruppe.schluessel]
-            self.var_gruppen[gruppe.schluessel] = tk.BooleanVar(value=an)
+            self.var_gruppen[gruppe.schluessel] = tk.BooleanVar(master, value=an)
         if not any(var.get() for var in self.var_gruppen.values()):
             # Alles abgewaehlt kann gespeichert worden sein, wenn die Datei von
             # Hand bearbeitet wurde - ohne Zeichen liesse sich nichts erzeugen.
             self.var_gruppen[ZEICHENGRUPPEN[1].schluessel].set(True)
 
-        self.var_passwort = tk.StringVar(value="")
-        self.var_zahl = tk.StringVar(value=str(laenge))
-        self.var_status = tk.StringVar(value="")
-        self.var_staerke = tk.StringVar(value="")
-        self.var_vorrat = tk.StringVar(value="")
+        self.var_passwort = tk.StringVar(master, value="")
+        self.var_zahl = tk.StringVar(master, value=str(laenge))
+        self.var_status = tk.StringVar(master, value="")
+        self.var_staerke = tk.StringVar(master, value="")
+        self.var_vorrat = tk.StringVar(master, value="")
         # Reiter "Prüfen": das eingegebene Passwort und sein Befund. Beides
         # lebt nur in diesen Variablen - gesichert wird davon nichts.
-        self.var_pruefen = tk.StringVar(value="")
-        self.var_pruef_staerke = tk.StringVar(value="")
-        self.var_pruef_zahlen = tk.StringVar(value="")
-        self.var_dunkel = tk.BooleanVar(value=CURRENT_THEME == "dark")
+        self.var_pruefen = tk.StringVar(master, value="")
+        self.var_pruef_staerke = tk.StringVar(master, value="")
+        self.var_pruef_zahlen = tk.StringVar(master, value="")
+        self.var_dunkel = tk.BooleanVar(master, value=CURRENT_THEME == "dark")
 
     def _stil_setzen(self) -> None:
         """ttk-Bedienelemente an das gewählte Farbschema anpassen.
@@ -892,6 +897,10 @@ class PasswortApp:
         self._pruefung_auffrischen()
         self.status(_("Bereit – „Neu generieren“ erzeugt das Passwort."))
 
+        # Erst jetzt: Ab hier gibt es eine Statuszeile, in der eine Meldung
+        # auch ankommt.
+        self.master.report_callback_exception = self._rueckruf_fehler
+
     def _reiter_gewechselt(self, _ereignis=None) -> None:
         self.aktiver_reiter = self.reiter.index("current")
         self._fusszeile_auffrischen()
@@ -938,8 +947,12 @@ class PasswortApp:
         tk = _tk
         leiste = faerben(tk.Frame(eltern), bg="STATUS_BG")
         leiste.pack(side="bottom", fill="x")
-        faerben(tk.Label(leiste, textvariable=self.var_status, font=FONT_SMALL, anchor="w"),
-                bg="STATUS_BG", fg="MUTED").pack(side="left", padx=14, pady=4)
+        # Die Farbe haengt am Zustand, nicht an einer festen Rolle - eine
+        # Fehlermeldung ist rot. Darum wird das Etikett gemerkt.
+        self.status_text = faerben(
+            tk.Label(leiste, textvariable=self.var_status, font=FONT_SMALL, anchor="w"),
+            bg="STATUS_BG", fg="MUTED")
+        self.status_text.pack(side="left", padx=14, pady=4)
         faerben(tk.Label(leiste, textvariable=self.var_vorrat, font=FONT_TINY, anchor="e"),
                 bg="STATUS_BG", fg="MUTED").pack(side="right", padx=(0, 14))
 
@@ -1305,7 +1318,22 @@ class PasswortApp:
         Eingegebene bleibt in der Variablen des Feldes und geht nirgendwo
         sonst hin - nicht in die Einstellungen, nicht in die Statuszeile.
         """
-        passwort = self.var_pruefen.get()
+        try:
+            self._pruefung_bilden(self.var_pruefen.get())
+        except Exception:
+            # Lieber gar kein Urteil als ein altes, das nicht mehr zum Feld
+            # passt. Weitergereicht wird der Fehler trotzdem - er gehört in
+            # die Statuszeile und nicht unter den Teppich.
+            self.pruef_stufe = None
+            self.pruef_bits = 0.0
+            self.pruef_balken.setzen(0.0, STAERKE_ROLLE["schwach"])
+            self.var_pruef_staerke.set("")
+            self._pruef_zahlen = _("Die Prüfung ist fehlgeschlagen.")
+            self.var_pruef_zahlen.set(self._pruef_zahlen)
+            raise
+
+    def _pruefung_bilden(self, passwort: str) -> None:
+        """Befund zu einem eingegebenen Passwort bilden und anzeigen."""
         self.pruef_bits = geschaetzte_bits(passwort)
         self.pruef_stufe = staerke_stufe(self.pruef_bits) if passwort else None
         if self.pruef_stufe is None:
@@ -1353,10 +1381,40 @@ class PasswortApp:
         if self.passwort:
             self.status(_("Einstellung geändert – „Neu generieren“ übernimmt sie."))
 
-    def status(self, text) -> None:
+    def _rueckruf_fehler(self, art, wert, spur) -> None:
+        """Fehler aus einem Tk-Rückruf sichtbar machen, statt ihn zu verlieren.
+
+        Tk schickt solche Fehler nach sys.stderr. In einem .pyw-Fenster gibt
+        es das nicht - die Meldung verschwände spurlos, während auf dem
+        Bildschirm eine Anzeige stehen bliebe, die nicht mehr stimmt. Bei
+        einer Stärkeanzeige ist das keine Kleinigkeit.
+
+        Gemeldet wird in der Statuszeile und nicht in einem eigenen Fenster:
+        Der Rückruf der Prüfung läuft bei jedem Tastendruck, ein Stapel von
+        Meldungsfenstern wäre schlimmer als der Fehler. Genannt wird nur die
+        Art des Fehlers - seine Meldung könnte das geprüfte Passwort
+        enthalten, und das bleibt, wo es ist.
+        """
+        if sys.stderr is not None:           # beim Start aus der Konsole
+            traceback.print_exception(art, wert, spur)
+        try:
+            self.status(_("Ein Fehler ist aufgetreten ({fehler}). Die Anzeige "
+                          "kann veraltet sein.").format(fehler=art.__name__),
+                        art="fehler")
+        except _tk.TclError:                 # Fenster schließt gerade
+            pass
+
+    def status(self, text, art: str = "ruhe") -> None:
         """Statusmeldung zeigen und für einen späteren Sprachwechsel merken."""
         self._status = text
+        self._status_art = art
         self.var_status.set(text)
+        self._status_faerben()
+
+    def _status_faerben(self) -> None:
+        """Farbe der Statuszeile aus dem gemerkten Zustand - Fehler fallen auf."""
+        rolle = "DANGER" if self._status_art == "fehler" else "MUTED"
+        self.status_text.configure(fg=THEMES[CURRENT_THEME][rolle])
 
     def _laufende_texte_auffrischen(self) -> None:
         """Texte, die zur Laufzeit entstehen, in die aktuelle Sprache bringen.
@@ -1380,6 +1438,7 @@ class PasswortApp:
             if stufe:
                 setzen(_(STAERKE_TEXT[stufe]))
         self._fusszeile_auffrischen()
+        self._status_faerben()
         self._hinweis_auffrischen()
 
     # -- Sprache und Farbschema --------------------------------------------
@@ -1445,6 +1504,7 @@ class PasswortApp:
             if self.pruef_stufe:
                 self.pruef_text.configure(
                     fg=THEMES[CURRENT_THEME][STAERKE_ROLLE[self.pruef_stufe]])
+            self._status_faerben()
             self._hinweis_auffrischen()
             self.master.update_idletasks()
         finally:
@@ -1619,6 +1679,9 @@ TRANSLATIONS = {
             "Setting changed – “Generate new” applies it.",
         "Zeichenvorrat: {anzahl} Zeichen · {bits} Bit":
             "Character pool: {anzahl} characters · {bits} bits",
+        "Ein Fehler ist aufgetreten ({fehler}). Die Anzeige "
+        "kann veraltet sein.":
+            "Something went wrong ({fehler}). What you see may be out of date.",
 
         # Reiter 2
         "Eigenes Passwort prüfen": "Check your own password",
@@ -1627,6 +1690,7 @@ TRANSLATIONS = {
             "The rating follows along as you type. The password you enter is "
             "not stored and not transmitted.",
         "Noch nichts eingegeben.": "Nothing entered yet.",
+        "Die Prüfung ist fehlgeschlagen.": "The check failed.",
         "{laenge} Zeichen · Vorrat {vorrat} Zeichen · {bits} Bit, "
         "wenn zufällig gewählt":
             "{laenge} characters · pool of {vorrat} · {bits} bits, "
