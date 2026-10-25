@@ -18,6 +18,9 @@ zum nächsten Start.
   in Bit, also Länge und Zeichenvorrat zusammen: rot unter 55 Bit, gelb bis
   70 Bit, grün darüber. Mit allen vier Zeichengruppen heißt das rot bis 8
   Zeichen, gelb bei 9 und 10, grün ab 11 – aus Ziffern allein braucht es 22.
+- **Eigenes Passwort prüfen** auf dem Reiter „Prüfen“: Eingabezeile, dieselbe
+  Bit-Rechnung, Ergebnis beim Tippen. Den Zeichenvorrat schätzt das Programm
+  aus den vorkommenden Zeichen. Gespeichert oder übertragen wird nichts.
 - **Zeichenauswahl** per Haken – Großbuchstaben, Kleinbuchstaben, Ziffern,
   Satz- und Sonderzeichen. Jede angehakte Gruppe kommt mindestens einmal vor,
   solange die Länge dafür reicht; damit scheitert kein Passwort an einer
@@ -58,7 +61,7 @@ python Passwort-Generator.pyw
 | Taste | Wirkung |
 |---|---|
 | `F5` | neues Passwort erzeugen |
-| `Strg`+`C` | Passwort in die Zwischenablage legen |
+| `Strg`+`C` | Passwort in die Zwischenablage legen – auf dem Reiter „Prüfen“ nicht |
 
 ## Wie das Passwort entsteht
 
@@ -72,6 +75,17 @@ Wie stark das Ergebnis ist, hängt an beidem: an der Länge und daran, aus wie
 vielen Zeichen gewürfelt wurde. Die Stärkeanzeige rechnet daraus den Zufall
 in Bit – Länge mal Logarithmus des Zeichenvorrats. Jedes Bit verdoppelt die
 Zahl der Möglichkeiten; die Fußzeile zeigt beide Zahlen.
+
+Der Reiter „Prüfen“ wendet dieselbe Rechnung auf ein eingegebenes Passwort
+an. Dort ist der Zeichenvorrat nicht bekannt, sondern wird aus den
+vorkommenden Zeichen geschätzt: eine Ziffer im Passwort heißt, dass alle
+zehn Ziffern möglich waren, ein Umlaut zählt für sich allein. Die Zahl ist
+damit eine Obergrenze und gilt nur für zufällig gewählte Passwörter – ein
+Wort aus dem Wörterbuch mit angehängter Jahreszahl lässt sich erraten, ohne
+alle Möglichkeiten durchzuprobieren.
+
+![Der Reiter „Prüfen“ bewertet ein eingegebenes Passwort: Stärkebalken,
+Zeichenvorrat und erreichte Bit](docs/screenshots/passwort-pruefen.png)
 
 Das erzeugte Passwort wird nirgends gespeichert; es verschwindet mit dem
 Schließen des Fensters. In der Einstellungsdatei stehen nur Länge,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import string
 
 import pytest
 
@@ -105,6 +106,96 @@ def test_ohne_zeichengruppe_keine_bits(pg):
     """Ohne Haken gibt es nichts zu bewerten - und keinen Rechenfehler."""
     assert pg.staerke_bits(16, []) == 0.0
     assert pg.staerke_stufe(pg.staerke_bits(16, [])) == "schwach"
+
+
+@pytest.mark.parametrize("passwort, vorrat", [
+    ("", 0),
+    ("12345", 10),                               # nur Ziffern
+    ("geheim", 26),                              # nur Kleinbuchstaben
+    ("Geheim", 52),                              # dazu Großbuchstaben
+    ("Geheim1", 62),                             # dazu Ziffern
+    ("Geheim1!", 62 + len(string.punctuation)),  # alle vier Gruppen
+    ("Käse", 53),                                # 26 + 26, das ä zählt einzeln
+    ("äöü", 3),                                  # keine Gruppe getroffen
+    ("!", len(string.punctuation)),              # Sonderzeichen allein
+    ("a b", 27),                                 # das Leerzeichen zählt einzeln
+    ("a\nb", 27),                                # ein eingefügter Umbruch auch
+    ("ääää", 1),                                 # vier gleiche: ein Zeichen Vorrat
+])
+def test_vorrat_wird_aus_den_zeichen_geschaetzt(pg, passwort, vorrat):
+    assert pg.vorrat_schaetzen(passwort) == vorrat
+
+
+def test_vorrat_zaehlt_jede_gruppe_nur_einmal(pg):
+    """Zehn Ziffern bleiben zehn Ziffern, auch wenn neun davon vorkommen."""
+    assert pg.vorrat_schaetzen("1") == pg.vorrat_schaetzen("1234567890")
+    assert pg.vorrat_schaetzen("aaaaaa") == pg.vorrat_schaetzen("abcdef")
+
+
+def test_unbekannte_zeichen_werden_vorsichtig_bewertet(pg):
+    """Über Zeichen außerhalb der vier Gruppen lässt sich nichts behaupten.
+
+    Sie zählen deshalb einzeln statt als Gruppe - lieber zu wenig Bit als
+    zu viele. Vier gleiche Umlaute sind damit ein Vorrat von einem Zeichen
+    und null Bit, während "aaaa" über die Gruppe der Kleinbuchstaben auf 19
+    Bit kommt. Die Zahl ist eine Obergrenze; nach unten darf sie irren.
+    """
+    assert pg.geschaetzte_bits("ääää") == 0.0
+    assert pg.geschaetzte_bits("ääää") < pg.geschaetzte_bits("aaaa")
+    assert pg.vorrat_schaetzen("абвгде") == 6        # je Zeichen eines
+
+
+@pytest.mark.parametrize("laenge, vorrat, bits", [
+    (0, 94, 0.0),                                # nichts eingegeben
+    (12, 0, 0.0),                                # kein Vorrat
+    (12, 1, 0.0),                                # ein einziges Zeichen: kein Zufall
+    (1, 2, 1.0),                                 # ein Bit ist eine Münze
+    (8, 2, 8.0),
+    (10, 1024, 100.0),
+])
+def test_bits_zaehlen(pg, laenge, vorrat, bits):
+    assert pg.bits_zaehlen(laenge, vorrat) == pytest.approx(bits)
+
+
+def test_erzeugtes_passwort_wird_genauso_bewertet(pg):
+    """Was der Generator auswirft, muss die Prüfung gleich bewerten.
+
+    Das ist kein Zufallstest: Jede angehakte Gruppe kommt mindestens einmal
+    vor, solange die Länge reicht - der geschätzte Vorrat trifft dann genau
+    den tatsächlichen.
+    """
+    gruppen = list(pg.ZEICHENGRUPPEN)
+    for laenge in (len(gruppen), 16, pg.MAX_LAENGE):
+        passwort = pg.passwort_erzeugen(laenge, gruppen)
+        assert pg.geschaetzte_bits(passwort) == pytest.approx(
+            pg.staerke_bits(laenge, gruppen)), passwort
+
+
+def test_eingabe_wird_wie_erzeugtes_passwort_gemessen(pg):
+    """Dieselbe Rechnung: 12 Ziffern sind hier wie dort 40 Bit."""
+    ziffern = [g for g in pg.ZEICHENGRUPPEN if g.schluessel == "ziffern"]
+    assert pg.geschaetzte_bits("123456789012") == pytest.approx(
+        pg.staerke_bits(12, ziffern))
+    assert pg.staerke_stufe(pg.geschaetzte_bits("123456789012")) == "schwach"
+
+
+@pytest.mark.parametrize("passwort, stufe", [
+    ("", "schwach"),
+    ("a", "schwach"),
+    ("123456789012345678901", "mittel"),         # 21 Ziffern, 70 Bit
+    ("1234567890123456789012", "stark"),         # 22 Ziffern, 73 Bit
+    ("Geheim1!", "schwach"),                     # 8 Zeichen, 52 Bit
+    ("Geheim12!", "mittel"),                     # 9 Zeichen, 59 Bit
+    ("Geheim123!!", "stark"),                    # 11 Zeichen, 72 Bit
+])
+def test_stufen_einer_eingabe(pg, passwort, stufe):
+    assert pg.staerke_stufe(pg.geschaetzte_bits(passwort)) == stufe
+
+
+def test_laengere_eingabe_bringt_mehr_bit(pg):
+    """Mehr Zeichen aus demselben Vorrat heißt mehr Zufall."""
+    assert pg.geschaetzte_bits("abc") < pg.geschaetzte_bits("abcd")
+    assert pg.geschaetzte_bits("abcd") < pg.geschaetzte_bits("abcD")
 
 
 def test_staerkefarben(pg):

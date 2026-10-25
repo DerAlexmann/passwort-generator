@@ -150,7 +150,8 @@ def texte_sammeln(app):
     lauf(app.master, "")
     for nummer in range(app.reiter.index("end")):
         gesammelt.append((f"reiter{nummer}", app.reiter.tab(nummer, "text")))
-    for name in ("var_status", "var_staerke", "var_vorrat", "var_zahl"):
+    for name in ("var_status", "var_staerke", "var_vorrat", "var_zahl",
+                 "var_pruefen", "var_pruef_staerke", "var_pruef_zahlen"):
         gesammelt.append((name, getattr(app, name).get()))
     return gesammelt
 
@@ -180,6 +181,8 @@ def farben_sammeln(app):
 
     lauf(app.master, "")
     gesammelt.append(("balken", "bg", str(app.balken.balken.cget("bg"))))
+    gesammelt.append(("pruefbalken", "bg", str(app.pruef_balken.balken.cget("bg"))))
     gesammelt.append(("staerketext", "fg", str(app.staerke_text.cget("fg"))))
+    gesammelt.append(("prueftext", "fg", str(app.pruef_text.cget("fg"))))
     gesammelt.append(("hinweis", "bg", str(app.hinweis.cget("bg"))))
     return gesammelt

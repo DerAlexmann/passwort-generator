@@ -3,6 +3,29 @@
 Das Format folgt [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionsnummern der [semantischen Versionierung](https://semver.org/lang/de/).
 
+## [1.3.0] – 2026-10-25
+
+### Hinzugefügt
+
+- Der neue Reiter „Prüfen“ bewertet ein selbst eingegebenes Passwort nach
+  demselben Maßstab wie das erzeugte: Länge mal Zeichenvorrat, in Bit, mit
+  denselben Grenzen bei 55 und 70 Bit. Der Zeichenvorrat ist hier nicht
+  bekannt und wird aus den vorkommenden Zeichen geschätzt – eine Ziffer im
+  Passwort heißt, dass alle zehn Ziffern möglich waren; Zeichen außerhalb
+  der vier Gruppen zählen einzeln. Das Eingegebene wird nicht gespeichert,
+  nicht in die Einstellungsdatei geschrieben und nicht übertragen; ein
+  Schalter leert das Feld. Vorschläge macht der Reiter keine.
+- Auf dem Reiter „Prüfen“ legt `Strg`+`C` nicht mehr das erzeugte Passwort
+  der anderen Seite in die Zwischenablage – samt Erfolgsmeldung, die man
+  dort gar nicht zu sehen bekam. Im Prüffeld kopiert die Tastenkombination
+  wie gewohnt die eigene Markierung.
+
+### Behoben
+
+- Ein Stärkebalken ohne Bit zeigte links einen roten Strich von einem
+  Pixel. Er bleibt jetzt leer – zu sehen war das bisher, wenn man alle
+  Zeichengruppen abwählte.
+
 ## [1.2.0] – 2026-10-11
 
 ### Geändert

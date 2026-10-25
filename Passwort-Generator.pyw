@@ -1,5 +1,5 @@
 """
-Passwort-Generator 1.2.0 - sichere Passwoerter erzeugen und kopieren
+Passwort-Generator 1.3.0 - sichere Passwoerter erzeugen und kopieren
 
 Erzeugt Passwoerter aus den gewaehlten Zeichengruppen mit dem
 Zufallsgenerator des Betriebssystems (secrets) und legt sie auf Wunsch in
@@ -28,7 +28,7 @@ import sys
 from dataclasses import dataclass
 
 PROGRAMM = "Passwort-Generator"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # Von gui_starten() belegt, sobald Tkinter geladen ist.
 _tk = None
@@ -331,15 +331,55 @@ def passwort_erzeugen(laenge: int, gruppen) -> str:
     return "".join(zeichen)
 
 
+def bits_zaehlen(laenge: int, vorrat: int) -> float:
+    """Zufall in Bit: Laenge mal Entropie eines einzelnen Zeichens.
+
+    Ein Vorrat aus einem einzigen Zeichen traegt nichts bei, ein leeres
+    Passwort auch nicht - beides sind null Bit und kein Rechenfehler.
+    """
+    return laenge * math.log2(vorrat) if vorrat > 1 else 0.0
+
+
 def staerke_bits(laenge: int, gruppen) -> float:
-    """Zufall im Passwort in Bit: Laenge mal Entropie eines einzelnen Zeichens.
+    """Zufall im erzeugten Passwort in Bit.
 
     Die Laenge allein sagt darueber wenig. 11 Ziffern sind 37 Bit und binnen
     Stunden durchprobiert; 11 Zeichen aus allen vier Gruppen sind 72 Bit. Erst
     Laenge und Zeichenvorrat zusammen ergeben ein Urteil.
     """
-    vorrat = len(vorrat_bilden(gruppen))
-    return laenge * math.log2(vorrat) if vorrat > 1 else 0.0
+    return bits_zaehlen(laenge, len(vorrat_bilden(gruppen)))
+
+
+def vorrat_schaetzen(passwort: str) -> int:
+    """Zeichenvorrat, aus dem ein eingegebenes Passwort gewuerfelt sein koennte.
+
+    Beim selbst erzeugten Passwort ist der Vorrat bekannt - es sind die
+    angehakten Gruppen. Bei einem mitgebrachten Passwort laesst er sich nur
+    schaetzen: Steht eine Ziffer darin, waren vermutlich alle zehn Ziffern
+    moeglich; steht ein Kleinbuchstabe darin, alle 26. Zeichen aus keiner der
+    vier Gruppen - Umlaute etwa oder das Leerzeichen - zaehlen einzeln, weil
+    sich ueber ihren Vorrat nichts sagen laesst.
+    """
+    uebrig = set(passwort)
+    vorrat = 0
+    for gruppe in ZEICHENGRUPPEN:
+        getroffen = uebrig & set(gruppe.zeichen)
+        if getroffen:
+            vorrat += len(gruppe.zeichen)
+            uebrig -= getroffen
+    return vorrat + len(uebrig)
+
+
+def geschaetzte_bits(passwort: str) -> float:
+    """Zufall in einem eingegebenen Passwort in Bit - derselbe Massstab.
+
+    Gerechnet wird mit derselben Funktion wie beim erzeugten Passwort, nur ist
+    der Zeichenvorrat hier geschaetzt. Vorausgesetzt ist dabei, dass das
+    Passwort zufaellig zustande kam: "Sommer2024!" bekommt so mehr Bit, als es
+    verdient, denn es laesst sich erraten, ohne alle Moeglichkeiten
+    durchzuprobieren. Die Zahl ist eine Obergrenze.
+    """
+    return bits_zaehlen(len(passwort), vorrat_schaetzen(passwort))
 
 
 def staerke_stufe(bits: float) -> str:
@@ -561,8 +601,7 @@ class Staerkebalken:
         self.balken = _tk.Frame(self.rahmen)
         self.rolle = "DANGER"
         self.anteil = 0.0
-        self.balken.place(x=0, y=0, relwidth=self.anteil, relheight=1.0)
-        self.neu_faerben()
+        self.setzen(self.anteil, self.rolle)
         GEFAERBTE_WIDGETS.append((self, None))       # faerbt sich selbst
 
     def pack(self, **kw):
@@ -572,7 +611,12 @@ class Staerkebalken:
     def setzen(self, anteil: float, rolle: str) -> None:
         self.anteil = max(0.0, min(1.0, anteil))
         self.rolle = rolle
-        self.balken.place_configure(relwidth=self.anteil)
+        if self.anteil:
+            self.balken.place(x=0, y=0, relwidth=self.anteil, relheight=1.0)
+        else:
+            # Bei relwidth=0 bleibt ein Pixel Farbe stehen - im leeren
+            # Prueffeld saehe man einen roten Strich ohne Aussage.
+            self.balken.place_forget()
         self.neu_faerben()
 
     def neu_faerben(self) -> None:
@@ -603,6 +647,10 @@ class PasswortApp:
         self.nachlauf = None                 # laufender after()-Auftrag zum Sichern
         self.bestaetigung_nachlauf = None    # laufender after()-Auftrag der Bestätigung
         self._status = None                  # zuletzt gezeigte Statusmeldung
+        self._vorrat = ""                    # Fußzeile rechts, für den Sprachwechsel
+        self._pruef_zahlen = ""              # Befund des Prüffelds, ebenso
+        self.pruef_bits = 0.0
+        self.pruef_stufe = None              # None heißt: im Prüffeld steht nichts
         self.skalierung = max(1.0, master.winfo_fpixels("1i") / 96.0)
         self.arbeitsflaeche = self._arbeitsflaeche_ermitteln()
 
@@ -751,6 +799,11 @@ class PasswortApp:
         self.var_status = tk.StringVar(value="")
         self.var_staerke = tk.StringVar(value="")
         self.var_vorrat = tk.StringVar(value="")
+        # Reiter "Prüfen": das eingegebene Passwort und sein Befund. Beides
+        # lebt nur in diesen Variablen - gesichert wird davon nichts.
+        self.var_pruefen = tk.StringVar(value="")
+        self.var_pruef_staerke = tk.StringVar(value="")
+        self.var_pruef_zahlen = tk.StringVar(value="")
         self.var_dunkel = tk.BooleanVar(value=CURRENT_THEME == "dark")
 
     def _stil_setzen(self) -> None:
@@ -816,6 +869,7 @@ class PasswortApp:
         # der Reiter ohne Verzoegerung, und das Fenster kennt von Anfang an
         # seinen groessten Platzbedarf.
         for titel, bauen in ((_("Passwort"), self._seite_passwort_bauen),
+                             (_("Prüfen"), self._seite_pruefen_bauen),
                              (_("Erklärungen"), self._seite_hilfe_bauen),
                              (_("Info & Copyright"), self._seite_info_bauen)):
             seite = faerben(tk.Frame(self.reiter), bg="BG")
@@ -826,17 +880,21 @@ class PasswortApp:
         self._statusleiste_bauen(self.aussen)
 
         self.reiter.select(self.aktiver_reiter)
-        self.reiter.bind("<<NotebookTabChanged>>",
-                         lambda _e: setattr(self, "aktiver_reiter", self.reiter.index("current")))
+        self.reiter.bind("<<NotebookTabChanged>>", self._reiter_gewechselt)
 
-        self.master.bind("<Control-c>", lambda _e: self.kopieren())
+        self.master.bind("<Control-c>", self._strg_c)
         self.master.bind("<F5>", lambda _e: self.erzeugen())
 
         # Beim Aufbau nur anzeigen, nicht speichern: Die Werte stehen ja gerade
         # erst aus der Einstellungsdatei in den Feldern.
         self._laenge_geaendert(sichern=False)
         self._auswahl_geaendert(sichern=False)
+        self._pruefung_auffrischen()
         self.status(_("Bereit – „Neu generieren“ erzeugt das Passwort."))
+
+    def _reiter_gewechselt(self, _ereignis=None) -> None:
+        self.aktiver_reiter = self.reiter.index("current")
+        self._fusszeile_auffrischen()
 
     def _reiter_beschriften(self, seite, titel) -> None:
         beschriftung_merken(lambda neu: self.reiter.tab(seite, text=f"  {neu}  "), titel)
@@ -980,7 +1038,71 @@ class PasswortApp:
             faerben(tk.Label(gitter, text=gruppe.zeichen, font=FONT_MONO_SMALL, anchor="w"),
                     bg="CARD", fg="MUTED").grid(row=reihe, column=1, sticky="w", padx=(12, 0))
 
-    # -- Reiter 2: Erklärungen ---------------------------------------------
+    # -- Reiter 2: Prüfen --------------------------------------------------
+
+    def _seite_pruefen_bauen(self, eltern) -> None:
+        tk = _tk
+        self.seite_pruefen = eltern
+        raster = faerben(tk.Frame(eltern), bg="BG")
+        raster.pack(fill="both", expand=True, padx=14, pady=14)
+
+        karte = make_card(raster, fill="x")
+        card_title(karte, _("Eigenes Passwort prüfen"))
+
+        # Das Feld zeigt offen, was darin steht: Wer ein Passwort von Hand
+        # eintippt, muss sehen koennen, ob er sich vertippt hat - sonst
+        # bewertet das Programm etwas anderes als das gemeinte Passwort.
+        self.pruef_feld = faerben(
+            tk.Entry(karte, textvariable=self.var_pruefen, font=FONT_PASSWORT,
+                     justify="center", width=MAX_LAENGE, relief="flat",
+                     highlightthickness=1, bd=0),
+            bg="FIELD_BG", fg="TEXT", insertbackground="TEXT",
+            selectbackground="ACCENT", selectforeground="ON_ACCENT",
+            highlightbackground="BORDER", highlightcolor="ACCENT")
+        self.pruef_feld.pack(fill="x", padx=14, pady=(0, 8))
+
+        card_text(karte, _("Die Bewertung läuft beim Tippen mit. Das eingegebene "
+                           "Passwort wird nicht gespeichert und nicht übertragen."))
+
+        # --- Staerke, dieselbe Anzeige wie beim erzeugten Passwort ---
+        staerke = faerben(tk.Frame(karte), bg="CARD")
+        staerke.pack(fill="x", padx=14, pady=(0, 10))
+        beschriften(faerben(tk.Label(staerke, font=FONT_SMALL, anchor="w"),
+                            bg="CARD", fg="MUTED"), _("Stärke")).pack(side="left")
+        self.pruef_text = faerben(
+            tk.Label(staerke, textvariable=self.var_pruef_staerke, font=FONT_BOLD,
+                     anchor="e", width=10), bg="CARD", fg="TEXT")
+        self.pruef_text.pack(side="right")
+        self.pruef_balken = Staerkebalken(staerke)
+        self.pruef_balken.pack(side="left", fill="x", expand=True, padx=10)
+
+        zeile = faerben(tk.Frame(karte), bg="CARD")
+        zeile.pack(fill="x", padx=14, pady=(0, 14))
+        faerben(tk.Label(zeile, textvariable=self.var_pruef_zahlen, font=FONT_SMALL,
+                         anchor="w"), bg="CARD", fg="MUTED").pack(side="left")
+        self.knopf_leeren = FlatButton(zeile, _("Feld leeren"), self.pruefung_leeren)
+        self.knopf_leeren.pack(side="right")
+
+        karte_massstab = make_card(raster, fill="x", pady=(12, 0))
+        card_title(karte_massstab, _("Woran gemessen wird"))
+        card_text(karte_massstab,
+                  _("Gerechnet wird mit demselben Maßstab wie beim erzeugten "
+                    "Passwort: Länge mal Zeichenvorrat, ausgedrückt in Bit. Welcher "
+                    "Vorrat gemeint ist, wird aus den vorkommenden Zeichen "
+                    "geschätzt – eine Ziffer im Passwort heißt, dass alle zehn "
+                    "Ziffern möglich waren. Zeichen außerhalb der vier Gruppen, "
+                    "etwa Umlaute, zählen einzeln."))
+        card_text(karte_massstab,
+                  _("Das setzt voraus, dass das Passwort zufällig zustande kam. Ein "
+                    "Wort aus dem Wörterbuch mit angehängter Jahreszahl bekommt "
+                    "hier deshalb zu viele Bit: Es lässt sich erraten, ohne alle "
+                    "Möglichkeiten durchzuprobieren. Die Zahl ist eine Obergrenze, "
+                    "kein Versprechen."))
+
+        # Erst jetzt horchen, damit die Anzeige steht, wenn sie gebraucht wird.
+        self.var_pruefen.trace_add("write", self._pruefung_auffrischen)
+
+    # -- Reiter 3: Erklärungen ---------------------------------------------
 
     def _seite_hilfe_bauen(self, eltern) -> None:
         tk = _tk
@@ -1022,7 +1144,7 @@ class PasswortApp:
         card_text(karte_tasten,
                   _("F5 erzeugt ein neues Passwort, Strg+C legt es in die Zwischenablage."))
 
-    # -- Reiter 3: Info ----------------------------------------------------
+    # -- Reiter 4: Info ----------------------------------------------------
 
     def _seite_info_bauen(self, eltern) -> None:
         tk = _tk
@@ -1076,6 +1198,17 @@ class PasswortApp:
         self.knopf_kopieren.configure(state="normal")
         self._hinweis_setzen(_("Fertig – zum Übernehmen kopieren."))
         self.status(_("Passwort mit {anzahl} Zeichen erzeugt.").format(anzahl=laenge))
+
+    def _strg_c(self, _ereignis) -> None:
+        """Strg+C kopiert das erzeugte Passwort - außer auf dem Reiter „Prüfen“.
+
+        Dort hätte es nichts zu suchen: Wer sein eigenes Passwort ansieht,
+        will nicht ungefragt ein fremdes in der Zwischenablage haben und
+        darüber auch noch eine Erfolgsmeldung lesen. Im Prüffeld kopiert die
+        Tastenkombination die eigene Markierung - das erledigt Tk selbst.
+        """
+        if not self._auf_pruefseite():
+            self.kopieren()
 
     def kopieren(self) -> None:
         """Passwort in die Zwischenablage legen und das bestätigen."""
@@ -1148,7 +1281,54 @@ class PasswortApp:
         self.var_staerke.set(_(STAERKE_TEXT[stufe]))
         self._vorrat = _("Zeichenvorrat: {anzahl} Zeichen · {bits} Bit").format(
             anzahl=len(vorrat_bilden(gruppen)), bits=round(self.staerke_bits))
-        self.var_vorrat.set(self._vorrat)
+        self._fusszeile_auffrischen()
+
+    def _auf_pruefseite(self) -> bool:
+        """Liegt der Reiter „Prüfen“ gerade obenauf?"""
+        return self.reiter.select() == str(self.seite_pruefen)
+
+    def _fusszeile_auffrischen(self) -> None:
+        """Rechte Fußzeile zeigen - außer auf dem Reiter „Prüfen“.
+
+        Sie beschreibt die Einstellungen des Generators. Neben einem
+        geprüften Passwort hätte sie nichts zu suchen: Dort stünden sonst
+        zwei verschiedene Bit-Angaben nebeneinander, und die eine gehörte
+        gar nicht zum Passwort, das man gerade ansieht.
+        """
+        self.var_vorrat.set("" if self._auf_pruefseite() else self._vorrat)
+
+    def _pruefung_auffrischen(self, *_ereignis) -> None:
+        """Eingegebenes Passwort bewerten - bei jedem Tastendruck neu.
+
+        Gemessen wird mit derselben Rechnung wie auf dem Reiter „Passwort“;
+        nur der Zeichenvorrat ist hier nicht bekannt, sondern geschätzt. Das
+        Eingegebene bleibt in der Variablen des Feldes und geht nirgendwo
+        sonst hin - nicht in die Einstellungen, nicht in die Statuszeile.
+        """
+        passwort = self.var_pruefen.get()
+        self.pruef_bits = geschaetzte_bits(passwort)
+        self.pruef_stufe = staerke_stufe(self.pruef_bits) if passwort else None
+        if self.pruef_stufe is None:
+            self.pruef_balken.setzen(0.0, STAERKE_ROLLE["schwach"])
+            self.pruef_text.configure(fg=THEMES[CURRENT_THEME]["TEXT"])
+            self.var_pruef_staerke.set("")
+            self._pruef_zahlen = _("Noch nichts eingegeben.")
+        else:
+            rolle = STAERKE_ROLLE[self.pruef_stufe]
+            self.pruef_balken.setzen(min(1.0, self.pruef_bits / BALKEN_VOLL_BIT), rolle)
+            self.pruef_text.configure(fg=THEMES[CURRENT_THEME][rolle])
+            self.var_pruef_staerke.set(_(STAERKE_TEXT[self.pruef_stufe]))
+            self._pruef_zahlen = _(
+                "{laenge} Zeichen · Vorrat {vorrat} Zeichen · {bits} Bit, "
+                "wenn zufällig gewählt").format(
+                    laenge=len(passwort), vorrat=vorrat_schaetzen(passwort),
+                    bits=round(self.pruef_bits))
+        self.var_pruef_zahlen.set(self._pruef_zahlen)
+
+    def pruefung_leeren(self) -> None:
+        """Prüffeld leeren - damit das eingegebene Passwort vom Bildschirm kommt."""
+        self.var_pruefen.set("")
+        self.pruef_feld.focus_set()
 
     def _laenge_geaendert(self, sichern: bool = True) -> None:
         self.var_zahl.set(str(self.var_laenge.get()))
@@ -1186,14 +1366,20 @@ class PasswortApp:
         deshalb nicht. Gemerkt ist jeweils der deutsche Schluessel samt
         eingesetzten Werten, sodass sie sich in jeder Sprache neu bilden lassen.
         """
-        for wert, setzen in ((self._status, self.var_status.set),
-                             (getattr(self, "_vorrat", None), self.var_vorrat.set)):
+        for name, setzen in (("_status", self.var_status.set),
+                             ("_vorrat", self.var_vorrat.set),
+                             ("_pruef_zahlen", self.var_pruef_zahlen.set)):
+            wert = getattr(self, name)      # steht seit __init__, ein Tippfehler fällt auf
             if isinstance(wert, Uebersetzt):
                 neu = _(wert.schluessel)
-                setzen(neu.format(**wert.werte) if wert.werte else neu)
-        stufe = getattr(self, "staerke_stufe", None)
-        if stufe:
-            self.var_staerke.set(_(STAERKE_TEXT[stufe]))
+                neu = neu.format(**wert.werte) if wert.werte else neu
+                setattr(self, name, neu)        # bleibt übersetzbar: trägt den Schlüssel
+                setzen(neu)
+        for stufe, setzen in ((getattr(self, "staerke_stufe", None), self.var_staerke.set),
+                              (self.pruef_stufe, self.var_pruef_staerke.set)):
+            if stufe:
+                setzen(_(STAERKE_TEXT[stufe]))
+        self._fusszeile_auffrischen()
         self._hinweis_auffrischen()
 
     # -- Sprache und Farbschema --------------------------------------------
@@ -1254,6 +1440,11 @@ class PasswortApp:
             # festen Rolle - farben_auffrischen() kennt sie deshalb nicht.
             stufe = getattr(self, "staerke_stufe", "schwach")
             self.staerke_text.configure(fg=THEMES[CURRENT_THEME][STAERKE_ROLLE[stufe]])
+            # Beim leeren Prüffeld steht keine Stufe fest; dann gilt die
+            # gewöhnliche Textfarbe, die farben_auffrischen() schon gesetzt hat.
+            if self.pruef_stufe:
+                self.pruef_text.configure(
+                    fg=THEMES[CURRENT_THEME][STAERKE_ROLLE[self.pruef_stufe]])
             self._hinweis_auffrischen()
             self.master.update_idletasks()
         finally:
@@ -1391,6 +1582,7 @@ TRANSLATIONS = {
         "Sprache & Darstellung": "Language & appearance",
         "Dunkel": "Dark",
         "Passwort": "Password",
+        "Prüfen": "Check",
         "Erklärungen": "Explanations",
         "Info & Copyright": "About & copyright",
 
@@ -1429,6 +1621,40 @@ TRANSLATIONS = {
             "Character pool: {anzahl} characters · {bits} bits",
 
         # Reiter 2
+        "Eigenes Passwort prüfen": "Check your own password",
+        "Die Bewertung läuft beim Tippen mit. Das eingegebene "
+        "Passwort wird nicht gespeichert und nicht übertragen.":
+            "The rating follows along as you type. The password you enter is "
+            "not stored and not transmitted.",
+        "Noch nichts eingegeben.": "Nothing entered yet.",
+        "{laenge} Zeichen · Vorrat {vorrat} Zeichen · {bits} Bit, "
+        "wenn zufällig gewählt":
+            "{laenge} characters · pool of {vorrat} · {bits} bits, "
+            "if chosen at random",
+        "Feld leeren": "Clear field",
+        "Woran gemessen wird": "What the rating goes by",
+        "Gerechnet wird mit demselben Maßstab wie beim erzeugten "
+        "Passwort: Länge mal Zeichenvorrat, ausgedrückt in Bit. Welcher "
+        "Vorrat gemeint ist, wird aus den vorkommenden Zeichen "
+        "geschätzt – eine Ziffer im Passwort heißt, dass alle zehn "
+        "Ziffern möglich waren. Zeichen außerhalb der vier Gruppen, "
+        "etwa Umlaute, zählen einzeln.":
+            "The rating uses the same measure as the generated password: length "
+            "times character pool, expressed in bits. Which pool that is gets "
+            "estimated from the characters that appear – a digit in the password "
+            "means all ten digits were possible. Characters outside the four "
+            "groups, umlauts for instance, count one by one.",
+        "Das setzt voraus, dass das Passwort zufällig zustande kam. Ein "
+        "Wort aus dem Wörterbuch mit angehängter Jahreszahl bekommt "
+        "hier deshalb zu viele Bit: Es lässt sich erraten, ohne alle "
+        "Möglichkeiten durchzuprobieren. Die Zahl ist eine Obergrenze, "
+        "kein Versprechen.":
+            "That assumes the password came about at random. A dictionary word "
+            "with a year tacked on therefore gets too many bits here: it can be "
+            "guessed without trying every possibility. The number is an upper "
+            "bound, not a promise.",
+
+        # Reiter 3
         "Wie das Passwort entsteht": "How the password is made",
         "Gewürfelt wird mit dem Zufallsgenerator des Betriebssystems "
         "(Python-Modul „secrets“), der für Passwörter und Schlüssel "
@@ -1468,7 +1694,7 @@ TRANSLATIONS = {
         "F5 erzeugt ein neues Passwort, Strg+C legt es in die Zwischenablage.":
             "F5 generates a new password, Ctrl+C puts it on the clipboard.",
 
-        # Reiter 3
+        # Reiter 4
         "Erzeugt Passwörter aus den gewählten Zeichengruppen und legt "
         "sie auf Wunsch in die Zwischenablage.":
             "Generates passwords from the selected groups of characters and "

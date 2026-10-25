@@ -7,7 +7,9 @@ Braucht einen Bildschirm; ohne Tkinter oder ohne Anzeige werden diese Tests
 from __future__ import annotations
 
 import json
+import math
 
+import pytest
 from conftest import farben_sammeln, texte_sammeln
 
 
@@ -83,6 +85,9 @@ def test_ohne_zeichengruppe_kein_erzeugen(pg, fenster):
         app.var_gruppen[gruppe.schluessel].set(False)
     app._auswahl_geaendert(sichern=False)
     assert str(app.knopf_neu["state"]) == "disabled"
+
+    assert app.balken.anteil == 0.0
+    assert app.balken.balken.place_info() == {}, "kein Pixel Farbe ohne Zeichengruppe"
 
     app.var_gruppen["ziffern"].set(True)
     app._auswahl_geaendert(sichern=False)
@@ -243,3 +248,195 @@ def test_fensterlage_ausserhalb_des_bildschirms_wird_zur_mitte(pg, fenster, monk
     assert (wurzel.winfo_x(), wurzel.winfo_y()) == (
         rand_x + max(0, (platz_breite - breite) // 2),
         rand_y + max(0, (platz_hoehe - hoehe) // 2))
+
+
+def test_pruefreiter_ist_vorhanden(pg, fenster):
+    """Vier Reiter, „Prüfen“ an zweiter Stelle."""
+    app = fenster.bauen()
+    titel = [app.reiter.tab(nummer, "text").strip()
+             for nummer in range(app.reiter.index("end"))]
+    assert titel == ["Passwort", "Prüfen", "Erklärungen", "Info & Copyright"]
+
+
+def test_pruefung_startet_leer(pg, fenster):
+    app = fenster.bauen()
+    assert app.var_pruefen.get() == ""
+    assert app.var_pruef_staerke.get() == ""
+    assert app.pruef_stufe is None
+    assert app.pruef_balken.anteil == 0.0
+    assert app.pruef_balken.balken.place_info() == {}, "kein Pixel Farbe ohne Eingabe"
+    assert app.var_pruef_zahlen.get() == "Noch nichts eingegeben."
+    assert str(app.pruef_text.cget("fg")) == pg.THEMES[pg.CURRENT_THEME]["TEXT"]
+
+
+@pytest.mark.parametrize("passwort, stufe, bits, anteil, zeile", [
+    ("123456789012", "schwach", 40, 0.40,
+     "12 Zeichen · Vorrat 10 Zeichen · 40 Bit, wenn zufällig gewählt"),
+    ("Geheim12!", "mittel", 59, 0.59,
+     "9 Zeichen · Vorrat 94 Zeichen · 59 Bit, wenn zufällig gewählt"),
+    ("Geheim123!!", "stark", 72, 0.72,
+     "11 Zeichen · Vorrat 94 Zeichen · 72 Bit, wenn zufällig gewählt"),
+    # Ab 100 Bit ist der Balken voll und bleibt es.
+    ("Geheim123!!xxxxxxxxx", "stark", 131, 1.0,
+     "20 Zeichen · Vorrat 94 Zeichen · 131 Bit, wenn zufällig gewählt"),
+])
+def test_pruefung_folgt_der_eingabe(pg, fenster, passwort, stufe, bits, anteil, zeile):
+    """Die Anzeige wird beim Tippen mitgeführt, ohne Zutun von außen."""
+    app = fenster.bauen()
+    app.var_pruefen.set(passwort)
+    app.master.update()
+    rolle = pg.STAERKE_ROLLE[stufe]
+    assert app.pruef_stufe == stufe
+    assert round(app.pruef_bits) == bits
+    assert app.pruef_balken.rolle == rolle
+    assert round(app.pruef_balken.anteil, 2) == anteil
+    # Tk gibt relwidth auf drei Stellen gerundet zurück.
+    assert float(app.pruef_balken.balken.place_info()["relwidth"]) == pytest.approx(
+        app.pruef_balken.anteil, abs=0.001)
+    assert str(app.pruef_text.cget("fg")) == pg.THEMES[pg.CURRENT_THEME][rolle]
+    assert app.var_pruef_staerke.get() == pg._(pg.STAERKE_TEXT[stufe])
+    assert app.var_pruef_zahlen.get() == zeile
+
+
+def test_sehr_lange_eingabe(pg, fenster):
+    """Eingefügter Fließtext sprengt weder Anzeige noch Fenster."""
+    app = fenster.bauen()
+    vorher = app.master.geometry()
+    app.var_pruefen.set("x" * 500)
+    app.master.update()
+    assert round(app.pruef_bits) == round(500 * math.log2(26))
+    assert app.pruef_balken.anteil == 1.0
+    assert app.master.geometry() == vorher
+
+
+def test_pruefung_haengt_nicht_an_den_reglern(pg, fenster):
+    """Länge und Haken des Generators gehen die Prüfung nichts an."""
+    app = fenster.bauen(laenge=64)
+    app.var_pruefen.set("12345")
+    app.master.update()
+    vorher = (app.pruef_bits, app.var_pruef_zahlen.get())
+
+    app.var_laenge.set(8)
+    app._laenge_geaendert(sichern=False)
+    for schluessel in ("gross", "klein", "sonder"):
+        app.var_gruppen[schluessel].set(False)
+    app._auswahl_geaendert(sichern=False)
+
+    assert (app.pruef_bits, app.var_pruef_zahlen.get()) == vorher
+    # Umgekehrt lässt die Prüfung die Anzeige des Generators in Ruhe.
+    staerke = (app.staerke_bits, app.balken.anteil, app.var_vorrat.get())
+    app.var_pruefen.set("Geheim123!!")
+    app.master.update()
+    assert (app.staerke_bits, app.balken.anteil, app.var_vorrat.get()) == staerke
+
+
+def test_feld_leeren(pg, fenster):
+    app = fenster.bauen()
+    app.var_pruefen.set("Geheim123!!")
+    app.master.update()
+    app.pruefung_leeren()
+    app.master.update()
+    assert app.var_pruefen.get() == ""
+    assert app.pruef_stufe is None
+    assert app.pruef_balken.anteil == 0.0
+    assert app.pruef_balken.balken.place_info() == {}
+    assert app.var_pruef_zahlen.get() == "Noch nichts eingegeben."
+
+
+def test_strg_c_schweigt_auf_dem_pruefreiter(pg, fenster):
+    """Auf dem Reiter „Prüfen“ kopiert Strg+C kein fremdes Passwort.
+
+    Gerufen wird die Weiche selbst: Ein mit event_generate geschicktes
+    Tastenereignis erreicht die Bindung am Fenster nicht verlässlich, weil Tk
+    Tasten an das Widget mit dem Fokus gibt und ein Testfenster keinen hat.
+    Dass die Taste am Fenster hängt, wird deshalb getrennt belegt.
+    """
+    app = fenster.bauen(laenge=16)
+    assert app.master.bind("<Control-c>"), "Strg+C hängt am Fenster"
+    app.erzeugen()
+    app.master.clipboard_clear()
+    app.master.clipboard_append("fremder Inhalt")
+    app.var_pruefen.set("Geheim123!!")
+
+    app.reiter.select(1)
+    app.master.update()
+    app._strg_c(None)
+    assert app.master.clipboard_get() == "fremder Inhalt"
+    assert app.var_status.get() != "In die Zwischenablage kopiert."
+    assert not app.hinweis.cget("text").startswith("✓")
+
+    app.reiter.select(0)
+    app.master.update()
+    app._strg_c(None)
+    assert app.master.clipboard_get() == app.passwort
+
+
+def test_eingegebenes_passwort_wird_nicht_gesichert(pg, fenster, monkeypatch):
+    """Was im Prüffeld steht, darf in keiner Einstellung landen."""
+    app = fenster.bauen()
+    app.var_pruefen.set("Mein-echtes-Passwort-99!")
+    app.master.update()
+    gesichert = {}
+    monkeypatch.setattr(pg, "save_config", lambda daten: gesichert.update(daten) or True)
+    app._einstellungen_sichern(mit_fenster=True)
+
+    assert set(gesichert) == {"language", "theme", "laenge", "zeichen", "fenster"}
+    assert "Mein-echtes-Passwort-99!" not in json.dumps(gesichert)
+    assert app.var_status.get() == "Bereit – „Neu generieren“ erzeugt das Passwort."
+
+
+def test_fusszeile_gehoert_dem_generator(pg, fenster):
+    """Der Zeichenvorrat unten rechts beschreibt den Generator, nicht die Prüfung."""
+    app = fenster.bauen(laenge=16)
+    assert app.var_vorrat.get() == "Zeichenvorrat: 94 Zeichen · 105 Bit"
+
+    app.reiter.select(1)
+    app.master.update()
+    assert app.var_vorrat.get() == ""
+    assert app.aktiver_reiter == 1
+
+    app.var_pruefen.set("Geheim12!")               # die Prüfung füllt sie nicht
+    app.sprache_setzen("en")                       # ein Sprachwechsel auch nicht
+    app.master.update()
+    assert app.var_vorrat.get() == ""
+
+    app.reiter.select(0)
+    app.master.update()
+    assert app.var_vorrat.get() == "Character pool: 94 characters · 105 bits"
+
+
+def test_pruefbefund_uebersteht_sprach_und_schemawechsel(pg, fenster):
+    app = fenster.bauen()
+    app.var_pruefen.set("Geheim12!")
+    app.master.update()
+    deutsch = (app.var_pruef_staerke.get(), app.var_pruef_zahlen.get())
+    assert deutsch == ("Mittel",
+                       "9 Zeichen · Vorrat 94 Zeichen · 59 Bit, wenn zufällig gewählt")
+
+    app.sprache_setzen("en")
+    assert app.var_pruef_staerke.get() == "Medium"
+    assert app.var_pruef_zahlen.get() == ("9 characters · pool of 94 · 59 bits, "
+                                          "if chosen at random")
+    assert app.var_pruefen.get() == "Geheim12!"
+
+    # Und zurück: Der gemerkte Text muss seinen Schlüssel behalten haben,
+    # sonst bliebe er in der zweiten Sprache stehen.
+    app.sprache_setzen("de")
+    assert (app.var_pruef_staerke.get(), app.var_pruef_zahlen.get()) == deutsch
+
+    for dunkel, schema in ((True, "dark"), (False, "light")):
+        app.var_dunkel.set(dunkel)
+        app._schema_umgeschaltet()
+        assert str(app.pruef_text.cget("fg")) == pg.THEMES[schema]["WARN"]
+        assert str(app.pruef_balken.balken.cget("bg")) == pg.THEMES[schema]["WARN"]
+
+
+def test_anzeige_rechnet_wie_die_funktion(pg, fenster):
+    """Die Oberfläche darf nicht anders rechnen als geschaetzte_bits()."""
+    app = fenster.bauen()
+    for passwort in ("", "a", "12345", "Käse", "ääää", "Geheim123!!", "x" * 200):
+        app.var_pruefen.set(passwort)
+        app.master.update()
+        assert app.pruef_bits == pg.geschaetzte_bits(passwort), passwort
+        if passwort:
+            assert str(pg.vorrat_schaetzen(passwort)) in app.var_pruef_zahlen.get()

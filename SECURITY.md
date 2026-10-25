@@ -19,7 +19,7 @@ Gepflegt wird jeweils die neueste veröffentlichte Version.
 
 | Version | Unterstützt |
 |---|---|
-| 1.2.x | ja |
+| 1.3.x | ja |
 | älter | nein |
 
 ## Wie das Programm mit Passwörtern umgeht
@@ -31,6 +31,12 @@ Gepflegt wird jeweils die neueste veröffentlichte Version.
   noch sonst auf der Festplatte. Es lebt im Speicher des laufenden Programms
   und verschwindet mit dem Schließen des Fensters. In `passwort-generator.json`
   stehen nur Länge, Zeichenauswahl, Sprache, Farbschema und Fensterlage.
+- **Geprüft** wird nur im Arbeitsspeicher: Was auf dem Reiter „Prüfen“ in
+  der Eingabezeile steht, bleibt dort. Es landet weder in der
+  Einstellungsdatei noch in einer Protokolldatei, und das Programm legt es
+  von sich aus auch nicht in die Zwischenablage – `Strg`+`C` kopiert dort
+  nur, was man selbst markiert hat. Mit „Feld leeren“ oder dem Schließen
+  des Fensters ist es weg.
 - **Übertragen** wird nichts. Das Programm baut keine Netzwerkverbindungen auf
   und lädt nichts nach.
 - **In die Zwischenablage** gelangt das Passwort nur auf ausdrücklichen Wunsch,

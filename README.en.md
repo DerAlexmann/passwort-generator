@@ -17,6 +17,9 @@ English, light and dark, and remembers every setting until the next start.
   length and character pool together: red below 55 bits, yellow up to 70
   bits, green above. With all four groups ticked that means red up to 8
   characters, yellow at 9 and 10, green from 11 – digits alone need 22.
+- **Check your own password** on the “Check” tab: a text field, the same bit
+  calculation, the verdict as you type. The character pool is estimated from
+  the characters that appear. Nothing is stored or transmitted.
 - **Character selection** by tick box – uppercase letters, lowercase letters,
   digits, punctuation and special characters. Every ticked group appears at
   least once as long as the length allows, so a password will not be rejected
@@ -56,7 +59,7 @@ python Passwort-Generator.pyw
 | Key | Effect |
 |---|---|
 | `F5` | generate a new password |
-| `Ctrl`+`C` | put the password on the clipboard |
+| `Ctrl`+`C` | put the password on the clipboard – not on the “Check” tab |
 
 ## How the password is made
 
@@ -70,6 +73,16 @@ How strong the result is depends on both the length and how many characters
 it was drawn from. The strength bar turns that into bits of randomness –
 length times the logarithm of the character pool. Every bit doubles the
 number of possibilities; the footer shows both numbers.
+
+The “Check” tab applies the same calculation to a password you type in.
+There the character pool is not known but estimated from the characters that
+appear: a digit means all ten digits were possible, an umlaut counts on its
+own. The number is therefore an upper bound and only holds for passwords
+chosen at random – a dictionary word with a year tacked on can be guessed
+without trying every possibility.
+
+![The “Check” tab rating a password typed in by the user: strength bar,
+character pool and bits reached](docs/screenshots/passwort-pruefen.png)
 
 The generated password is never written down; it is gone once the window
 closes. The settings file only holds length, character selection, language,
