@@ -1,0 +1,200 @@
+name: Release
+
+# Baut bei einem Versions-Tag (z. B. v1.3.2) die Windows-EXE und ein
+# Quellpaket und haengt beides an einen GitHub-Release - zusammen mit der
+# Pruefsumme und den Lizenzen der mitgelieferten Komponenten.
+#
+# Ohne Tag laeuft alles ausser dem letzten Schritt: Der Bau und seine
+# Pruefungen lassen sich per workflow_dispatch proben, ohne zu taggen.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quellpaket:
+    name: Quellpaket (ZIP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: ZIP packen
+        # Wer das Skript statt der EXE nimmt, soll Lizenz, Hinweise und
+        # Dokumentation in einem Paket haben - das Programm selbst ist eine
+        # einzige Datei. LICENSE und NOTICE gehoeren dazu, die MIT-Lizenz
+        # verlangt ihre Weitergabe.
+        run: |
+          mkdir -p out/Passwort-Generator
+          cp Passwort-Generator.pyw passwort_generator.ico LICENSE NOTICE \
+             DRITTANBIETER-LIZENZEN.md README.md README.en.md CHANGELOG.md \
+             out/Passwort-Generator/
+          # Schraegstriche im Ref-Namen werden ersetzt: Bei einem Probelauf von
+          # einem Branch wie dependabot/pip/... zeigte der Pfad sonst in einen
+          # Ordner, den es nicht gibt. Tags wie v1.3.2 bleiben, wie sie sind.
+          cd out && zip -r "Passwort-Generator-${GITHUB_REF_NAME//\//-}-quellen.zip" Passwort-Generator
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: quellpaket
+          # Vorgabe waere "warn": Der Release entstuende stillschweigend ohne
+          # Quellpaket.
+          if-no-files-found: error
+          path: out/*.zip
+
+  windows-exe:
+    name: Windows-EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          # Diese Fassung wandert in die EXE und steht so auch in
+          # requirements-build.txt und in DRITTANBIETER-LIZENZEN.md.
+          # tests/test_verpackung.py haelt die Stellen zusammen.
+          python-version: "3.14"
+
+      - name: Abhaengigkeiten installieren
+        # Genaue Versionen aus requirements-build.txt: Derselbe Tag soll
+        # zweimal dieselbe EXE ergeben. Das Programm selbst braucht nichts.
+        # Kein "pip install --upgrade pip" davor: Es waere der einzige
+        # ungepinnte Schritt im Bau, und sein Fehlschlag fiele in einem
+        # mehrzeiligen Block nicht einmal auf.
+        run: pip install -r requirements-build.txt
+
+      - name: Versionsmetadaten erzeugen
+        # Ohne --version-file bleiben Produktname, Version und Urheber in den
+        # Dateieigenschaften leer - PyInstaller legt von sich aus keine
+        # Versionsressource an. Die Angaben kommen aus VERSION in der .pyw.
+        run: python versionsinfo_erzeugen.py
+
+      - name: EXE bauen
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name "Passwort-Generator"
+          --icon passwort_generator.ico
+          --version-file versionsinfo.txt
+          Passwort-Generator.pyw
+
+      - name: Versionsangaben der EXE pruefen
+        # Der einzige Schritt, der die fertige Datei ansieht: Fehlt die
+        # Versionsressource, faellt es sonst niemandem auf. Bei einem Tag muss
+        # die Version ausserdem zum Tag passen - sonst wurde VERSION in der
+        # .pyw vergessen, und die EXE meldete die alte Nummer.
+        run: |
+          $info = (Get-Item "dist\Passwort-Generator.exe").VersionInfo
+          if (-not $info.ProductName -or -not $info.ProductVersion) {
+            throw "Die EXE traegt keine Versionsangaben - wurde --version-file uebergeben?"
+          }
+          Write-Output "ProductName: $($info.ProductName), ProductVersion: $($info.ProductVersion)"
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and "v$($info.ProductVersion)" -ne $env:GITHUB_REF_NAME) {
+            throw "Tag $($env:GITHUB_REF_NAME) passt nicht zu ProductVersion $($info.ProductVersion) - VERSION vergessen?"
+          }
+
+      - name: Startet die EXE ueberhaupt?
+        # Mehr als ein Lebenszeichen: Dass der Prozess nach ein paar Sekunden
+        # noch laeuft, beweist nichts - faellt das Programm beim Start um,
+        # zeigt es ein Meldungsfenster und wartet darin beliebig lange.
+        # Geprueft wird deshalb, ob ein Fenster da ist und ob das Programm
+        # beim Schliessen seine Einstellungen schreibt. Das tut nur die
+        # fertig aufgebaute Oberflaeche; ein Meldungsfenster tut es nicht.
+        run: |
+          $einstellungen = "dist\passwort-generator.json"
+          if (Test-Path $einstellungen) { Remove-Item $einstellungen }
+          $p = Start-Process -FilePath "dist\Passwort-Generator.exe" -PassThru
+          $fenster = $null
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            if ($p.HasExited) { throw "Die EXE hat sich sofort beendet (Exit $($p.ExitCode))." }
+            $fenster = Get-Process -Name "Passwort-Generator" -ErrorAction SilentlyContinue |
+                       Where-Object { $_.MainWindowHandle -ne 0 }
+            if ($fenster) { break }
+          }
+          if (-not $fenster) { throw "Nach 30 Sekunden steht kein Fenster - die EXE startet nicht." }
+          foreach ($f in $fenster) { [void]$f.CloseMainWindow() }
+          foreach ($i in 1..15) {
+            Start-Sleep -Seconds 1
+            if (-not (Get-Process -Name "Passwort-Generator" -ErrorAction SilentlyContinue)) { break }
+          }
+          Get-Process -Name "Passwort-Generator" -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not (Test-Path $einstellungen)) {
+            throw "Beim Schliessen entstanden keine Einstellungen - lief das Programm, oder stand nur ein Meldungsfenster?"
+          }
+          Remove-Item $einstellungen          # gehoert nicht ans Release
+          Write-Output "EXE laeuft: Fenster da, Einstellungen beim Schliessen geschrieben."
+
+      - name: Pruefsumme
+        # Die SHA-256 haengt als SHA256SUMS.txt am Release: Wer die EXE laedt,
+        # kann sie vor dem ersten Start vergleichen - sie ist nicht signiert.
+        # Geschrieben wird mit LF und ohne Stuecklliste, damit "sha256sum -c"
+        # die Datei lesen kann, und danach einmal zurueckgelesen.
+        run: |
+          $h = (Get-FileHash "dist\Passwort-Generator.exe" -Algorithm SHA256).Hash.ToLower()
+          Write-Output "SHA-256: $h"
+          $zeile = "$h  Passwort-Generator.exe`n"
+          [IO.File]::WriteAllText("dist\SHA256SUMS.txt", $zeile, [Text.UTF8Encoding]::new($false))
+          if ([IO.File]::ReadAllText("dist\SHA256SUMS.txt") -ne $zeile) {
+            throw "SHA256SUMS.txt gibt nicht wieder, was gerade gerechnet wurde."
+          }
+
+      - name: Lizenzhinweise neben die EXE legen
+        # Die Lizenzen der mitgelieferten Komponenten muessen den Anwender
+        # erreichen, nicht nur das Repository - deshalb haengt die Datei am
+        # Release und liegt im Quellpaket.
+        run: Copy-Item DRITTANBIETER-LIZENZEN.md dist/
+
+      - name: Liegt alles bereit?
+        # if-no-files-found greift erst, wenn gar nichts passt: Bei einer
+        # Liste aus drei Pfaden faellt eine einzelne fehlende Datei nicht auf.
+        # Deshalb hier einzeln nachsehen, bevor hochgeladen wird.
+        run: |
+          foreach ($datei in @("dist\Passwort-Generator.exe",
+                               "dist\SHA256SUMS.txt",
+                               "dist\DRITTANBIETER-LIZENZEN.md")) {
+            if (-not (Test-Path $datei)) { throw "$datei fehlt - so darf kein Release entstehen." }
+            Write-Output "da: $datei"
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe
+          # Vorgabe waere "warn": Traefe kein einziger Pfad, lieferte das
+          # Release stillschweigend nichts mit.
+          if-no-files-found: error
+          path: |
+            dist/Passwort-Generator.exe
+            dist/SHA256SUMS.txt
+            dist/DRITTANBIETER-LIZENZEN.md
+
+  release:
+    name: Release veroeffentlichen
+    needs: [quellpaket, windows-exe]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Nur bei einem Tag. Ohne Tag kennt die Action keinen Namen fuer den
+    # Release und bricht ab - ein Probelauf per workflow_dispatch soll bauen
+    # und pruefen duerfen, ohne an diesem Schritt rot zu werden.
+    if: github.ref_type == 'tag'
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artefakte
+
+      - name: Release anlegen
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true          # erst ansehen, dann von Hand veroeffentlichen
+          generate_release_notes: true
+          # Vorgabe ist false: Ein Pfad, der nichts trifft, wuerde den Release
+          # ohne diese Datei anlegen. Hier darf nichts fehlen.
+          fail_on_unmatched_files: true
+          files: |
+            artefakte/quellpaket/Passwort-Generator-*-quellen.zip
+            artefakte/windows-exe/Passwort-Generator.exe
+            artefakte/windows-exe/SHA256SUMS.txt
+            artefakte/windows-exe/DRITTANBIETER-LIZENZEN.md

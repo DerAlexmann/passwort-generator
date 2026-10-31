@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Feste Bauversionen in requirements-build.txt
+  - package-ecosystem: "pip"
+    directory: "/"
+    # "Leave the version requirement unchanged if it already allows the new
+    # release": Untergrenzen wie pytest>=8.0 in requirements-dev.txt bleiben in
+    # Ruhe - sie nennen die aelteste Fassung, mit der die Tests laufen, nicht
+    # die neueste. Angehoben wird nur, was eine neue Fassung gar nicht zulaesst,
+    # also die festgenagelten Versionen in requirements-build.txt. Ohne diese
+    # Zeile kaemen Vorschlaege, die nur Untergrenzen heben und allen dazwischen
+    # die Installation verwehren, ohne Nutzen.
+    versioning-strategy: "increase-if-necessary"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # Versionen der GitHub-Actions in den Workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"

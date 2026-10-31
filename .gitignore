@@ -2,6 +2,8 @@
 build/
 dist/
 *.spec
+# Von versionsinfo_erzeugen.py erstellt - abgeleitet, gehoert nicht ins Repository
+versionsinfo.txt
 
 # Python
 __pycache__/

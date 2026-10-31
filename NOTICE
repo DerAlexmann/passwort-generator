@@ -1,0 +1,46 @@
+Passwort-Generator
+Copyright (c) 2026 Alexander Unverhau
+Created with assistance of Claude AI (Anthropic)
+
+Licensed under the MIT License. The full license text is in the file LICENSE
+next to this one; this file adds no conditions of its own.
+
+Die mitgelieferte Windows-EXE enthält zusätzlich Bestandteile anderer Projekte:
+die Python-Laufzeit, Tcl/Tk und einige Bibliotheken, die der Windows-Build von
+Python mitbringt. Sie sind in der Datei DRITTANBIETER-LIZENZEN.md mit Lizenz und
+Quelle aufgeführt. Alle stehen unter permissiven Lizenzen, und die GPLv2 des
+PyInstaller-Bootloaders nimmt damit erzeugte Programme ausdrücklich aus – die
+EXE wird deshalb ebenfalls unter der MIT-Lizenz weitergegeben.
+
+The bundled Windows executable additionally contains components from other
+projects: the Python runtime, Tcl/Tk and a few libraries that the Windows build
+of Python brings along. They are listed with their licenses and sources in the
+file DRITTANBIETER-LIZENZEN.md. All of them are permissively licensed, and the
+GPLv2 of the PyInstaller bootloader explicitly exempts programs built with it,
+so the executable is distributed under the MIT License as well.
+
+
+Hinweis zur Entstehung
+----------------------
+
+Der Passwort-Generator ist in Zusammenarbeit mit Claude AI (Anthropic)
+entstanden. Dieser Hinweis steht der Transparenz halber überall dort, wo auch
+der Copyright-Vermerk steht: im Kopf von Passwort-Generator.pyw, im Reiter
+"Info & Copyright" der Anwendung, in den Dateieigenschaften der EXE, in dieser
+Datei sowie in README.md und README.en.md.
+
+An den Bedingungen der MIT-Lizenz ändert er nichts. Das Urheberrecht liegt bei
+Alexander Unverhau.
+
+
+Note on authorship
+------------------
+
+Passwort-Generator was created with assistance of Claude AI (Anthropic). For
+transparency, this note appears everywhere the copyright notice does: in the
+header of Passwort-Generator.pyw, in the application's "Info & copyright" tab,
+in the file properties of the executable, in this file, and in README.md and
+README.en.md.
+
+It does not change the terms of the MIT License in any way. The copyright
+remains with Alexander Unverhau.

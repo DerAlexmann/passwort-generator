@@ -15,8 +15,8 @@ jobs:
     name: Stil (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install ruff
@@ -29,13 +29,37 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python: ["3.10", "3.12"]
+        python: ["3.10", "3.12", "3.14"]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -r requirements-dev.txt
       # Auf den Linux-Läufern fehlt Tkinter; die Tests der Oberfläche
       # überspringen sich dort von selbst, die übrigen laufen überall.
       - run: python -m pytest tests -q
+
+  bauversionen:
+    name: Fester Bau (PyInstaller)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: pip install -r requirements-build.txt
+      - run: pip install -r requirements-dev.txt
+      # Zwei Schritte und kein mehrzeiliger Block: Auf Windows-Laeufern
+      # prueft die Huelle nur den Exit-Code des letzten Befehls. Scheiterte
+      # der Erzeuger, liefe pytest danach gruen durch - und der Job waere
+      # gruen, obwohl die Versionsdatei nie entstanden ist.
+      - name: Versionsdatei erzeugen
+        run: python versionsinfo_erzeugen.py
+      # PYINSTALLER_PFLICHT macht den PyInstaller-Test zur Pflicht: Ein
+      # Ueberspringen waere sonst gruen, ohne dass die gepinnte Fassung
+      # etwas geprueft haette.
+      - name: Waechter der Verpackung
+        env:
+          PYINSTALLER_PFLICHT: "1"
+        run: python -m pytest tests/test_verpackung.py -q

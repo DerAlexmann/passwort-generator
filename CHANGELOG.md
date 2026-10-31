@@ -3,6 +3,51 @@
 Das Format folgt [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionsnummern der [semantischen Versionierung](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+
+- Die EXE trägt jetzt **Versionsangaben**: Produktname, Version, Urheber und ein
+  Zeiger auf die Lizenzdatei stehen in den Dateieigenschaften. Wer die Datei
+  heruntergeladen hat, kann nachsehen, welche Fassung vor ihm liegt – bisher
+  waren diese Felder leer. `versionsinfo_erzeugen.py` erzeugt sie aus `VERSION`;
+  die Versionsnummer bleibt an einer Stelle.
+- **`DRITTANBIETER-LIZENZEN.md` und `NOTICE`** nennen zweisprachig, was in der
+  EXE mitgeliefert wird: die Python-Laufzeit, Tcl/Tk und die Bibliotheken aus
+  dem Windows-Build von Python, jeweils mit Lizenz und geprüfter Quelle. Alle
+  stehen unter permissiven Lizenzen, und die GPLv2 des PyInstaller-Bootloaders
+  nimmt damit erzeugte Programme ausdrücklich aus – die EXE bleibt MIT.
+- Ein **Release-Workflow** baut die EXE, liest ihre Versionsangaben aus der
+  fertigen Datei zurück, hält sie gegen den Tag, startet sie einmal zur Probe,
+  bildet die SHA-256-Summe und hängt EXE, `SHA256SUMS.txt`, Lizenzhinweise und
+  ein Quellpaket an einen Release-Entwurf. Ohne Tag läuft alles davon als
+  Probelauf.
+- **`requirements-build.txt`** nagelt die Fassung von PyInstaller fest und nennt
+  die Python-Fassung, die in die EXE wandert. Ein eigener CI-Job baut damit und
+  prüft die Versionsdatei. Nicht festgelegt sind die mitgezogenen
+  Abhängigkeiten und das Laufzeitabbild des Läufers, und es sind keine
+  Hash-Pins – Bit für Bit reproduzierbar ist der Bau also nicht.
+- **Dependabot** pflegt die Actions in den Workflows und die festen
+  Bauversionen; die Untergrenzen der Entwicklungswerkzeuge bleiben unberührt.
+- **`tests/test_verpackung.py`** wacht über all das: Versionsangaben,
+  Lizenzzeilen in beiden Sprachen, Prüfsumme am Release, Probelauf-Bedingung,
+  die Reihe in `SECURITY.md` und den Erst-Start-Hinweis in beiden READMEs.
+  Jeder dieser Wächter wurde einmal absichtlich rot gesetzt.
+
+### Geändert
+
+- Die CI testet jetzt auch **Python 3.14** – die Fassung, die in der EXE steckt.
+  Bisher lief sie nur unter 3.10 und 3.12, die ausgelieferte Laufzeit berührte
+  also kein Test.
+- `build.cmd` erzeugt die Versionsangaben mit und legt die Lizenzhinweise neben
+  die EXE, damit ein Bau auf dem eigenen Rechner dasselbe ergibt wie der im
+  Release.
+- Die **Prüfsumme** liegt künftig als `SHA256SUMS.txt` am Release. Beide READMEs
+  und `SECURITY.md` verweisen darauf; bisher stand dort „aus den Release-Notizen",
+  und genau dort steht sie nach der Umstellung nicht mehr.
+
+Am Programm selbst ändert sich nichts.
+
 ## [1.3.1] – 2026-10-25
 
 ### Behoben

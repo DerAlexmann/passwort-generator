@@ -44,7 +44,8 @@ file appears next to it when you first close the window.
 > hold on to a freshly downloaded, unknown file for a few seconds while it
 > scans it; starting the program during that time may fail with "Access
 > denied". Wait a moment and start it again. To be on the safe side, compare
-> the SHA-256 checksum from the release notes first.
+> the SHA-256 checksum against `SHA256SUMS.txt` on the release first:
+> `Get-FileHash .\Passwort-Generator.exe -Algorithm SHA256`.
 
 **As a script:** double-click `Passwort-Generator.pyw`. All it needs is Python
 3.10 or newer with Tkinter, which ships with the Windows installer. No further
@@ -118,3 +119,9 @@ welcome). Please report security issues through the route described in
 
 [MIT](LICENSE) – Copyright 2026 Alexander Unverhau.
 Created with assistance of Claude AI.
+
+The script needs nothing but Python. The **executable** additionally contains
+the Python runtime, Tcl/Tk and a few libraries from the Windows build of
+Python; [DRITTANBIETER-LIZENZEN.md](DRITTANBIETER-LIZENZEN.md) lists them with
+their licences and sources. All of them are permissively licensed, so the
+executable stays MIT as well. Short version: [NOTICE](NOTICE).
