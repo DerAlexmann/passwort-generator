@@ -49,7 +49,7 @@ Gepflegt wird jeweils die neueste veröffentlichte Version.
 ## Die veröffentlichte EXE
 
 Die EXE ist nicht signiert. Prüfe nach dem Herunterladen die SHA-256-Summe
-gegen die Angabe in den Release-Notizen:
+gegen `SHA256SUMS.txt`, das am Release hängt:
 
 ```powershell
 Get-FileHash .\Passwort-Generator.exe -Algorithm SHA256

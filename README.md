@@ -46,7 +46,8 @@ installiert; die Einstellungsdatei entsteht beim ersten Schließen daneben.
 > unbekannte Datei gern für ein paar Sekunden fest, während er sie prüft; ein
 > Startversuch in dieser Zeit kann mit „Zugriff verweigert" abbrechen.
 > Einfach kurz warten und erneut starten. Wer sichergehen will, vergleicht
-> vorher die SHA-256-Prüfsumme aus den Release-Notizen.
+> vorher die SHA-256-Prüfsumme mit `SHA256SUMS.txt` am Release:
+> `Get-FileHash .\Passwort-Generator.exe -Algorithm SHA256`.
 
 **Als Skript:** `Passwort-Generator.pyw` doppelklicken. Nötig ist nur Python
 3.10 oder neuer mit Tkinter, das bei der Windows-Installation dabei ist.
@@ -121,3 +122,9 @@ Sicherheitslücken bitte nicht als Issue, sondern über den Weg in
 
 [MIT](LICENSE) – Copyright 2026 Alexander Unverhau.
 Erstellt mit Unterstützung von Claude AI.
+
+Das Skript braucht nichts außer Python. Die **EXE** enthält zusätzlich die
+Python-Laufzeit, Tcl/Tk und einige Bibliotheken aus dem Windows-Build von
+Python; [DRITTANBIETER-LIZENZEN.md](DRITTANBIETER-LIZENZEN.md) führt sie mit
+Lizenz und Quelle auf. Alle stehen unter permissiven Lizenzen, die EXE bleibt
+deshalb ebenfalls MIT. Kurzfassung: [NOTICE](NOTICE).

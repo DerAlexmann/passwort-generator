@@ -21,6 +21,9 @@ siehe [SECURITY.md](SECURITY.md).
 | `Passwort-Generator.pyw` | das ganze Programm, eine Datei |
 | `tests/` | Tests für Passwortlogik, Sprachtabelle und Oberfläche |
 | `build.cmd`, `icon_erzeugen.py` | EXE und Programmsymbol erzeugen |
+| `versionsinfo_erzeugen.py` | Versionsangaben für die EXE aus `VERSION` |
+| `requirements-build.txt` | genaue Versionen, mit denen die EXE gepackt wird |
+| `DRITTANBIETER-LIZENZEN.md`, `NOTICE` | was in der EXE mitgeliefert wird |
 
 Die Programmdatei ist von oben nach unten gegliedert: Farbschemata,
 Sprachumschaltung, Einstellungen, Passwortlogik, Bausteine der Oberfläche,
@@ -84,6 +87,9 @@ alle. Der Test `test_fenster_passt_in_jede_sprache` prüft das.
   „Unveröffentlicht" ergänzen.
 - Bildschirmfotos zeigen ausschließlich das Programmfenster – kein Desktop,
   keine anderen Fenster, keine persönlichen Pfade.
+- Ändert sich, was die EXE mitliefert – eine andere Python-Fassung, eine neue
+  Bibliothek –, gehört das in [DRITTANBIETER-LIZENZEN.md](DRITTANBIETER-LIZENZEN.md),
+  und zwar in beide Sprachabschnitte. `tests/test_verpackung.py` prüft das.
 
 ## Lizenz
 

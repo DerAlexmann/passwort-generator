@@ -1,0 +1,24 @@
+# Abhaengigkeiten fuer den Bau der Windows-EXE / dependencies for building the EXE
+#
+# Das Programm selbst braucht nichts davon: Passwort-Generator.pyw kommt mit der
+# Standardbibliothek aus. Hier steht nur, womit die veroeffentlichte EXE gepackt
+# wird - mit genauen Versionen und nicht mit Untergrenzen. Derselbe Tag soll
+# zweimal dieselbe EXE ergeben, und eine fehlerhafte neue Fassung von
+# PyInstaller soll keinen Release kippen. Dependabot hebt diese Zeile an; die
+# neue Fassung wird dann einmal bewusst geprueft, statt unbemerkt in ein Release
+# zu rutschen.
+#
+# Nicht festgelegt sind die mitgezogenen Abhaengigkeiten von PyInstaller und das
+# Laufzeitabbild des Runners. Hash-Pins (--require-hashes) sind es ebenfalls
+# nicht. Bit fuer Bit reproduzierbar ist der Bau also nicht.
+#
+# Exact versions on purpose: the same tag must produce the same executable. The
+# program itself needs none of this - it runs on the standard library alone.
+
+pyinstaller==6.22.2
+
+# Die Python-Fassung, die in die EXE wandert - sie bringt die Laufzeit, Tkinter
+# und die unten in DRITTANBIETER-LIZENZEN.md aufgefuehrten Bibliotheken mit.
+# Der Release-Workflow baut mit genau dieser Fassung, die CI testet sie mit;
+# tests/test_verpackung.py haelt beide Stellen zusammen.
+# Python: 3.14
