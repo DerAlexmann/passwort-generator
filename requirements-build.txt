@@ -15,7 +15,7 @@
 # Exact versions on purpose: the same tag must produce the same executable. The
 # program itself needs none of this - it runs on the standard library alone.
 
-pyinstaller==6.22.2
+pyinstaller==6.22.3
 
 # Die Python-Fassung, die in die EXE wandert - sie bringt die Laufzeit, Tkinter
 # und die unten in DRITTANBIETER-LIZENZEN.md aufgefuehrten Bibliotheken mit.
